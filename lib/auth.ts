@@ -1,160 +1,114 @@
-import { neonDB } from "./neon"
+"use client"
 
-export interface LoginCredentials {
-  email: string
-  password: string
+import type { User } from "./user-types"
+
+// Sistema de autenticação em memória (temporário)
+let currentUser: User | null = null
+
+// Usuários mock para desenvolvimento
+const mockUsers: User[] = [
+  {
+    id: "1",
+    nome: "Admin",
+    email: "admin@unk.com",
+    senha: "admin123",
+    tipo: "admin",
+    ativo: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    nome: "Jack",
+    email: "jack@unk.com",
+    senha: "jack123",
+    tipo: "dj",
+    ativo: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+]
+
+export async function login(email: string, senha: string): Promise<User | null> {
+  const user = mockUsers.find((u) => u.email === email && u.senha === senha && u.ativo)
+  if (user) {
+    currentUser = user
+    if (typeof window !== "undefined") {
+      localStorage.setItem("currentUser", JSON.stringify(user))
+    }
+    return user
+  }
+  return null
 }
 
-export interface AuthUser {
-  id: number
-  nome: string
-  email: string
-  tipo: string
-  role?: string
-  is_active?: boolean
-  last_login?: string
+export function getCurrentUser(): User | null {
+  if (currentUser) return currentUser
+
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem("currentUser")
+    if (stored) {
+      currentUser = JSON.parse(stored)
+      return currentUser
+    }
+  }
+
+  return null
+}
+
+export function setCurrentUser(user: User | null): void {
+  currentUser = user
+  if (typeof window !== "undefined") {
+    if (user) {
+      localStorage.setItem("currentUser", JSON.stringify(user))
+    } else {
+      localStorage.removeItem("currentUser")
+    }
+  }
+}
+
+export function isAdmin(): boolean {
+  const user = getCurrentUser()
+  return user?.tipo === "admin"
+}
+
+export function logout(): void {
+  currentUser = null
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("currentUser")
+  }
+}
+
+export function isAuthenticated(): boolean {
+  return getCurrentUser() !== null
+}
+
+export function requireAuth(): User {
+  const user = getCurrentUser()
+  if (!user) {
+    throw new Error("Usuário não autenticado")
+  }
+  return user
+}
+
+export function requireAdmin(): User {
+  const user = requireAuth()
+  if (user.tipo !== "admin") {
+    throw new Error("Acesso negado: apenas administradores")
+  }
+  return user
 }
 
 /**
- * Simple in-memory store.
- * In production you should replace this with
- * real authentication (e.g. Supabase, Clerk, NextAuth, etc.).
+ * Wrapper conveniente para que o build encontre um export nomeado “AuthService”.
+ * Ele simplesmente aponta para as funções já existentes.
  */
-let currentUser: User | null = null
-
-export type User = {
-  id: string
-  name: string
-  email: string
-  role: "admin" | "user" | string
+export const AuthService = {
+  login,
+  getCurrentUser,
+  setCurrentUser,
+  isAdmin,
+  logout,
+  isAuthenticated,
+  requireAuth,
+  requireAdmin,
 }
-
-export class AuthService {
-  private static readonly SESSION_KEY = "unk_user_session"
-
-  static async login(credentials: LoginCredentials): Promise<AuthUser | null> {
-    console.log("🔐 [AUTH] Attempting login for:", credentials.email)
-
-    try {
-      const user = await neonDB.getUsuarioByEmail(credentials.email)
-
-      if (!user) {
-        console.log("❌ [AUTH] User not found")
-        return null
-      }
-
-      if (!user.ativo) {
-        console.log("❌ [AUTH] User account is inactive")
-        return null
-      }
-
-      // Simple password check (in production, use proper hashing)
-      if (user.senha !== credentials.password) {
-        console.log("❌ [AUTH] Invalid password")
-        return null
-      }
-
-      // Update last login
-      try {
-        await neonDB.updateUsuario(user.id, {
-          ...user,
-          updated_at: new Date().toISOString(),
-        })
-      } catch (updateError) {
-        console.warn("⚠️ [AUTH] Could not update last login:", updateError)
-      }
-
-      const authUser: AuthUser = {
-        id: user.id,
-        nome: user.nome,
-        email: user.email,
-        tipo: user.tipo,
-        role: user.tipo === "admin" ? "admin" : "user",
-        is_active: user.ativo,
-        last_login: new Date().toISOString(),
-      }
-
-      // Store session
-      await this.setSession(authUser)
-
-      console.log("✅ [AUTH] Login successful for:", user.nome)
-      return authUser
-    } catch (error) {
-      console.error("❌ [AUTH] Login error:", error)
-      return null
-    }
-  }
-
-  static async logout(): Promise<void> {
-    console.log("🚪 [AUTH] Logging out user")
-
-    await this.setCurrentUser(null)
-  }
-
-  static async getCurrentUser(): Promise<User | null> {
-    if (typeof window === "undefined") {
-      return null
-    }
-
-    try {
-      const sessionData = localStorage.getItem(this.SESSION_KEY) || sessionStorage.getItem(this.SESSION_KEY)
-
-      if (!sessionData) {
-        return null
-      }
-
-      const user = JSON.parse(sessionData) as User
-      console.log("👤 [AUTH] Current user:", user.name)
-      return user
-    } catch (error) {
-      console.error("❌ [AUTH] Error getting current user:", error)
-      await this.logout() // Clear corrupted session
-      return null
-    }
-  }
-
-  static async setSession(user: AuthUser): Promise<void> {
-    if (typeof window === "undefined") {
-      return
-    }
-
-    const sessionData = JSON.stringify(user)
-    localStorage.setItem(this.SESSION_KEY, sessionData)
-    console.log("💾 [AUTH] Session stored for:", user.nome)
-  }
-
-  static async isAuthenticated(): Promise<boolean> {
-    return (await this.getCurrentUser()) !== null
-  }
-
-  static async isAdmin(): Promise<boolean> {
-    const user = await this.getCurrentUser()
-    return user?.role === "admin" || false
-  }
-
-  static async requireAuth(): Promise<AuthUser> {
-    const user = await this.getCurrentUser()
-    if (!user) {
-      throw new Error("Authentication required")
-    }
-    return user
-  }
-
-  static async requireAdmin(): Promise<AuthUser> {
-    const user = await this.requireAuth()
-    if (!(await this.isAdmin())) {
-      throw new Error("Admin access required")
-    }
-    return user
-  }
-
-  /**
-   * Persist a user in the in-memory store (or clear it with `null`).
-   */
-  private static async setCurrentUser(user: User | null): Promise<void> {
-    currentUser = user
-  }
-}
-
-// Export default instance
-export const authService = AuthService

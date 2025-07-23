@@ -1,365 +1,171 @@
 "use client"
 
-import { CardDescription } from "@/components/ui/card"
-
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Users, UserPlus, Edit, Trash2, Download, Search } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
-import { getCurrentUser, isAdmin } from "@/lib/auth"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { Trash2, Edit, Plus, Search } from "lucide-react"
+import type { User } from "@/lib/user-types"
 
-interface User {
-  id: number
-  nome: string
-  email: string
-  role: string
-  is_active: boolean
-  last_login?: string
-  created_at: string
-  updated_at: string
+interface UserManagementProps {
+  users: User[]
+  onUserUpdate: (user: User) => void
+  onUserDelete: (userId: string) => void
+  onUserCreate: (user: Omit<User, "id" | "created_at" | "updated_at">) => void
 }
 
-export default function UserManagement() {
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+export default function UserManagement({ users, onUserUpdate, onUserDelete, onUserCreate }: UserManagementProps) {
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedRole, setSelectedRole] = useState("all")
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [newUser, setNewUser] = useState({
     nome: "",
     email: "",
     senha: "",
-    role: "user",
+    tipo: "dj" as "admin" | "dj",
+    ativo: true,
   })
-  const [user] = useState(() => getCurrentUser())
 
-  useEffect(() => {
-    if (isAdmin()) {
-      fetchUsers()
-    }
-  }, [])
-
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch("/api/admin/users")
-      if (response.ok) {
-        const data = await response.json()
-        setUsers(data)
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar usuários",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCreateUser = async () => {
-    try {
-      const response = await fetch("/api/admin/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newUser),
-      })
-
-      if (response.ok) {
-        toast({
-          title: "Sucesso",
-          description: "Usuário criado com sucesso",
-        })
-        setIsCreateDialogOpen(false)
-        setNewUser({ nome: "", email: "", senha: "", role: "user" })
-        fetchUsers()
-      } else {
-        throw new Error("Falha ao criar usuário")
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Falha ao criar usuário",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleUpdateUser = async (userId: number, updates: Partial<User>) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      })
-
-      if (response.ok) {
-        toast({
-          title: "Sucesso",
-          description: "Usuário atualizado com sucesso",
-        })
-        fetchUsers()
-      } else {
-        throw new Error("Falha ao atualizar usuário")
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Falha ao atualizar usuário",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleDeleteUser = async (userId: number) => {
-    if (!confirm("Tem certeza que deseja excluir este usuário?")) return
-
-    try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: "DELETE",
-      })
-
-      if (response.ok) {
-        toast({
-          title: "Sucesso",
-          description: "Usuário excluído com sucesso",
-        })
-        fetchUsers()
-      } else {
-        throw new Error("Falha ao excluir usuário")
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Falha ao excluir usuário",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const exportUsers = () => {
-    const csv = [
-      ["Nome", "Email", "Role", "Ativo", "Último Login", "Criado em"],
-      ...users.map((user) => [
-        user.nome,
-        user.email,
-        user.role,
-        user.is_active ? "Sim" : "Não",
-        user.last_login || "Nunca",
-        new Date(user.created_at).toLocaleDateString("pt-BR"),
-      ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n")
-
-    const blob = new Blob([csv], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "usuarios.csv"
-    a.click()
-  }
-
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
+  const filteredUsers = users.filter(
+    (user) =>
       user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRole = selectedRole === "all" || user.role === selectedRole
-    return matchesSearch && matchesRole
-  })
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
-  const stats = {
-    total: users.length,
-    active: users.filter((u) => u.is_active).length,
-    admins: users.filter((u) => u.role === "admin").length,
-    recent: users.filter((u) => {
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      return new Date(u.created_at) > weekAgo
-    }).length,
+  const handleCreateUser = () => {
+    onUserCreate(newUser)
+    setNewUser({ nome: "", email: "", senha: "", tipo: "dj", ativo: true })
+    setIsCreateDialogOpen(false)
   }
 
-  if (!isAdmin()) {
-    return (
-      <Card className="max-w-md mx-auto mt-10">
-        <CardHeader>
-          <CardTitle>Permissão negada</CardTitle>
-        </CardHeader>
-        <CardContent>Você não tem acesso a esta área.</CardContent>
-      </Card>
-    )
+  const handleEditUser = () => {
+    if (selectedUser) {
+      onUserUpdate(selectedUser)
+      setIsEditDialogOpen(false)
+      setSelectedUser(null)
+    }
   }
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64">Carregando...</div>
+  const handleDeleteUser = (userId: string) => {
+    if (confirm("Tem certeza que deseja excluir este usuário?")) {
+      onUserDelete(userId)
+    }
   }
 
   return (
     <div className="space-y-6">
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
-            <Users className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.active}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Administradores</CardTitle>
-            <Users className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.admins}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Novos (7 dias)</CardTitle>
-            <Users className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.recent}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Content */}
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Gerenciamento de Usuários</CardTitle>
-              <CardDescription>Gerencie usuários do sistema, roles e permissões</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={exportUsers} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Novo Usuário
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Criar Novo Usuário</DialogTitle>
-                    <DialogDescription>Preencha os dados do novo usuário</DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="nome">Nome</Label>
-                      <Input
-                        id="nome"
-                        value={newUser.nome}
-                        onChange={(e) => setNewUser({ ...newUser, nome: e.target.value })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={newUser.email}
-                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="senha">Senha</Label>
-                      <Input
-                        id="senha"
-                        type="password"
-                        value={newUser.senha}
-                        onChange={(e) => setNewUser({ ...newUser, senha: e.target.value })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="role">Role</Label>
-                      <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="user">Usuário</SelectItem>
-                          <SelectItem value="admin">Administrador</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleCreateUser}>Criar Usuário</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Filters */}
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Gerenciamento de Usuários</h2>
+          <p className="text-muted-foreground">Gerencie usuários do sistema</p>
+        </div>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Usuário
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Criar Novo Usuário</DialogTitle>
+              <DialogDescription>Preencha os dados do novo usuário</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="nome">Nome</Label>
                 <Input
-                  placeholder="Buscar usuários..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  id="nome"
+                  value={newUser.nome}
+                  onChange={(e) => setNewUser({ ...newUser, nome: e.target.value })}
                 />
               </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="senha">Senha</Label>
+                <Input
+                  id="senha"
+                  type="password"
+                  value={newUser.senha}
+                  onChange={(e) => setNewUser({ ...newUser, senha: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="tipo">Tipo</Label>
+                <Select
+                  value={newUser.tipo}
+                  onValueChange={(value: "admin" | "dj") => setNewUser({ ...newUser, tipo: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dj">DJ</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="ativo"
+                  checked={newUser.ativo}
+                  onCheckedChange={(checked) => setNewUser({ ...newUser, ativo: checked })}
+                />
+                <Label htmlFor="ativo">Usuário Ativo</Label>
+              </div>
+              <Button onClick={handleCreateUser} className="w-full">
+                Criar Usuário
+              </Button>
             </div>
-            <Select value={selectedRole} onValueChange={setSelectedRole}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Roles</SelectItem>
-                <SelectItem value="user">Usuário</SelectItem>
-                <SelectItem value="admin">Administrador</SelectItem>
-              </SelectContent>
-            </Select>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Usuários ({filteredUsers.length})</CardTitle>
+          <CardDescription>Lista de todos os usuários do sistema</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-2 mb-4">
+            <Search className="w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar usuários..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-sm"
+            />
           </div>
 
-          {/* Users Table */}
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Último Login</TableHead>
                 <TableHead>Criado em</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
@@ -370,31 +176,78 @@ export default function UserManagement() {
                   <TableCell className="font-medium">{user.nome}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                      {user.role === "admin" ? "Admin" : "Usuário"}
-                    </Badge>
+                    <Badge variant={user.tipo === "admin" ? "destructive" : "default"}>{user.tipo.toUpperCase()}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={user.is_active ? "default" : "destructive"}>
-                      {user.is_active ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {user.last_login ? new Date(user.last_login).toLocaleDateString("pt-BR") : "Nunca"}
+                    <Badge variant={user.ativo ? "default" : "secondary"}>{user.ativo ? "Ativo" : "Inativo"}</Badge>
                   </TableCell>
                   <TableCell>{new Date(user.created_at).toLocaleDateString("pt-BR")}</TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setEditingUser(user)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDeleteUser(user.id)}
-                        disabled={user.role === "admin"}
-                      >
-                        <Trash2 className="h-4 w-4" />
+                    <div className="flex items-center space-x-2">
+                      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Editar Usuário</DialogTitle>
+                            <DialogDescription>Altere os dados do usuário</DialogDescription>
+                          </DialogHeader>
+                          {selectedUser && (
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="edit-nome">Nome</Label>
+                                <Input
+                                  id="edit-nome"
+                                  value={selectedUser.nome}
+                                  onChange={(e) => setSelectedUser({ ...selectedUser, nome: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="edit-email">Email</Label>
+                                <Input
+                                  id="edit-email"
+                                  type="email"
+                                  value={selectedUser.email}
+                                  onChange={(e) => setSelectedUser({ ...selectedUser, email: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="edit-tipo">Tipo</Label>
+                                <Select
+                                  value={selectedUser.tipo}
+                                  onValueChange={(value: "admin" | "dj") =>
+                                    setSelectedUser({ ...selectedUser, tipo: value })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="dj">DJ</SelectItem>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id="edit-ativo"
+                                  checked={selectedUser.ativo}
+                                  onCheckedChange={(checked) => setSelectedUser({ ...selectedUser, ativo: checked })}
+                                />
+                                <Label htmlFor="edit-ativo">Usuário Ativo</Label>
+                              </div>
+                              <Button onClick={handleEditUser} className="w-full">
+                                Salvar Alterações
+                              </Button>
+                            </div>
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteUser(user.id)}>
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -408,5 +261,5 @@ export default function UserManagement() {
   )
 }
 
-// also expose a named export for the bundler
-export { default as UserManagement } from "./UserManagement"
+// Export nomeado exigido no build
+export { UserManagement }
