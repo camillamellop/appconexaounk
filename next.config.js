@@ -9,15 +9,13 @@ const withPWA = require("next-pwa")({
       handler: "NetworkFirst",
       options: {
         cacheName: "offlineCache",
-        expiration: {
-          maxEntries: 200,
-        },
+        expiration: { maxEntries: 200 },
       },
     },
   ],
 })
 
-/** @type {import('next').NextConfig} */
+/** @type {import("next").NextConfig} */
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
@@ -29,13 +27,12 @@ const nextConfig = {
     unoptimized: true,
   },
   webpack: (config, { isServer }) => {
-    // Only the server bundle should include Node-specific libraries.
+    // Prevent client bundle from trying to polyfill Node-only modules
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         assert: false,
         buffer: false,
-        child_process: false,
         crypto: false,
         dns: false,
         fs: false,
@@ -44,11 +41,12 @@ const nextConfig = {
         net: false,
         os: false,
         path: false,
-        pg: false,
         stream: false,
         tls: false,
         url: false,
         zlib: false,
+        child_process: false,
+        pg: false, // ⬅️ avoid bundling the pg driver in client
       }
     }
     return config

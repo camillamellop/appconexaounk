@@ -752,5 +752,4 @@ export default function SecuritySettings() {
   )
 }
 
-// Named export for compatibility
 export type { SecuritySettings }
