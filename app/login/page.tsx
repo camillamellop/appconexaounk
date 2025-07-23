@@ -1,26 +1,26 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Music, User, Lock } from "lucide-react"
+import { Loader2, Music } from "lucide-react"
+import { setCurrentUser } from "@/lib/auth"
+import Image from "next/image"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [senha, setSenha] = useState("")
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setLoading(true)
     setError("")
 
     try {
@@ -29,13 +29,13 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, senha }),
       })
 
       const data = await response.json()
 
-      if (response.ok) {
-        localStorage.setItem("user", JSON.stringify(data.user))
+      if (data.success) {
+        setCurrentUser(data.user)
         router.push("/")
       } else {
         setError(data.error || "Erro ao fazer login")
@@ -43,90 +43,81 @@ export default function LoginPage() {
     } catch (error) {
       setError("Erro de conexão. Tente novamente.")
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const testAccounts = [
-    { email: "liam@unk.com", password: "liam123", name: "Liam (DJ)" },
-    { email: "admin@unk.com", password: "admin123", name: "Admin" },
-    { email: "suzy@unk.com", password: "suzy123", name: "Suzy (Manager)" },
-    { email: "camilla@unk.com", password: "camilla123", name: "Camilla (Producer)" },
-  ]
-
-  const fillTestAccount = (testEmail: string, testPassword: string) => {
-    setEmail(testEmail)
-    setPassword(testPassword)
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-      <div className="w-full max-w-md space-y-6">
-        {/* Logo/Header */}
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center space-x-2">
-            <Music className="h-8 w-8 text-white" />
-            <h1 className="text-3xl font-bold text-white">UNK Dashboard</h1>
-          </div>
-          <p className="text-gray-300">Acesse sua conta para continuar</p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background com imagem do iPod */}
+      <div className="absolute inset-0 z-0">
+        <Image src="/images/ipod-login-design.png" alt="iPod Login Background" fill className="object-cover" priority />
+        <div className="absolute inset-0 bg-black/40" />
+      </div>
 
-        {/* Login Form */}
-        <Card className="bg-white/10 backdrop-blur-md border-white/20">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center text-white">Login</CardTitle>
-            <CardDescription className="text-center text-gray-300">Entre com suas credenciais</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      {/* Container principal com design de iPod */}
+      <div className="relative z-10 w-full max-w-sm">
+        {/* Tela do iPod */}
+        <div className="bg-white rounded-3xl p-8 shadow-2xl border-8 border-gray-300 relative">
+          {/* Tela LCD do iPod */}
+          <div className="bg-gradient-to-b from-gray-100 to-gray-200 rounded-2xl p-6 mb-6 border-2 border-gray-400">
+            {/* Header da tela */}
+            <div className="text-center mb-6">
+              <div className="flex justify-center mb-3">
+                <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center">
+                  <Music className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              <h1 className="text-xl font-bold text-black mb-1">UNK Dashboard</h1>
+              <p className="text-sm text-gray-600">Entre com suas credenciais</p>
+            </div>
+
+            {/* Formulário */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white">
+                <Label htmlFor="email" className="text-sm font-medium text-black">
                   Email
                 </Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                    required
-                  />
-                </div>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-white border-2 border-gray-300 rounded-lg text-black placeholder:text-gray-500 focus:border-blue-500"
+                  required
+                  disabled={loading}
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-white">
+                <Label htmlFor="senha" className="text-sm font-medium text-black">
                   Senha
                 </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                    required
-                  />
-                </div>
+                <Input
+                  id="senha"
+                  type="password"
+                  placeholder="Sua senha"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  className="bg-white border-2 border-gray-300 rounded-lg text-black placeholder:text-gray-500 focus:border-blue-500"
+                  required
+                  disabled={loading}
+                />
               </div>
 
               {error && (
-                <Alert className="bg-red-500/10 border-red-500/20">
-                  <AlertDescription className="text-red-300">{error}</AlertDescription>
+                <Alert className="bg-red-100 border-red-300">
+                  <AlertDescription className="text-red-700 text-sm">{error}</AlertDescription>
                 </Alert>
               )}
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                disabled={isLoading}
+                className="w-full bg-gradient-to-b from-gray-200 to-gray-400 hover:from-gray-300 hover:to-gray-500 text-black border-2 border-gray-500 rounded-lg font-medium shadow-inner"
+                disabled={loading}
               >
-                {isLoading ? (
+                {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Entrando...
@@ -136,29 +127,40 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Test Accounts */}
-        <Card className="bg-white/5 backdrop-blur-md border-white/10">
-          <CardHeader>
-            <CardTitle className="text-sm text-white">Contas de Teste</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {testAccounts.map((account, index) => (
-              <Button
-                key={index}
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-gray-300 hover:text-white hover:bg-white/10"
-                onClick={() => fillTestAccount(account.email, account.password)}
-              >
-                <User className="mr-2 h-3 w-3" />
-                {account.name}
-              </Button>
-            ))}
-          </CardContent>
-        </Card>
+          {/* Roda de controle do iPod */}
+          <div className="flex justify-center">
+            <div className="w-32 h-32 bg-gradient-to-b from-gray-200 to-gray-400 rounded-full border-4 border-gray-500 shadow-inner relative">
+              {/* Centro da roda */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-gradient-to-b from-gray-300 to-gray-500 rounded-full border-2 border-gray-600 shadow-inner flex items-center justify-center">
+                <div className="w-8 h-8 bg-gray-400 rounded-full"></div>
+              </div>
+
+              {/* Botões da roda */}
+              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gray-600 rounded-full"></div>
+              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gray-600 rounded-full"></div>
+              <div className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-gray-600 rounded-full"></div>
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-gray-600 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Contas de teste */}
+        <div className="mt-6 bg-black/60 backdrop-blur-sm rounded-lg p-4">
+          <p className="text-white text-sm font-medium mb-2">Contas de teste:</p>
+          <div className="space-y-1 text-xs text-gray-300">
+            <p>
+              <strong>Admin:</strong> camilla@conexaounk.com / camillaunk
+            </p>
+            <p>
+              <strong>DJ Pedro:</strong> pedro@conexaounk.com / pedrounk
+            </p>
+            <p>
+              <strong>DJ Suzy:</strong> suzy@conexaounk.com / suzyunk
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )

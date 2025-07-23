@@ -60,7 +60,7 @@
     "@upstash/redis": "latest",
     "@vercel/postgres": "latest",
     "@xata.io/client": "latest",
-    "bcryptjs": "latest",
+    "bcryptjs": "^2.4.3",
     "better-sqlite3": "latest",
     "bun-types": "latest",
     "class-variance-authority": "^0.7.1",
