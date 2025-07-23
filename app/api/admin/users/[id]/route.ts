@@ -1,86 +1,75 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
+import { getSql } from "@/lib/neon"
 
-const sql = neon(process.env.NEON_NEON_DATABASE_URL!)
+const sql = getSql()
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = Number.parseInt(params.id)
+    const userId = Number(params.id)
     const updates = await request.json()
 
     if (!userId) {
       return NextResponse.json({ error: "ID do usuário é obrigatório" }, { status: 400 })
     }
 
-    // Build dynamic update query
-    const updateFields = []
-    const values = []
-    let paramIndex = 1
+    // constrói o UPDATE dinamicamente
+    const allowed = ["nome", "email", "role", "is_active"]
+    const setParts: string[] = []
+    const values: any[] = []
 
-    for (const [key, value] of Object.entries(updates)) {
-      if (["nome", "email", "role", "is_active"].includes(key)) {
-        updateFields.push(`${key} = $${paramIndex}`)
+    Object.entries(updates).forEach(([key, value]) => {
+      if (allowed.includes(key)) {
+        setParts.push(`${key} = $${setParts.length + 1}`)
         values.push(value)
-        paramIndex++
       }
-    }
+    })
 
-    if (updateFields.length === 0) {
+    if (!setParts.length) {
       return NextResponse.json({ error: "Nenhum campo válido para atualizar" }, { status: 400 })
     }
 
-    updateFields.push(`updated_at = CURRENT_TIMESTAMP`)
-    values.push(userId)
+    // updated_at automático
+    setParts.push(`updated_at = CURRENT_TIMESTAMP`)
+    values.push(userId) // WHERE id = $n
 
     const query = `
-      UPDATE usuarios 
-      SET ${updateFields.join(", ")}
-      WHERE id = $${paramIndex}
+      UPDATE public.usuarios
+      SET ${setParts.join(", ")}
+      WHERE id = $${values.length}
       RETURNING id, nome, email, role, is_active, created_at, updated_at
     `
-
     const result = await sql(query, values)
 
-    if (result.length === 0) {
+    if (!result.length) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
     return NextResponse.json(result[0])
-  } catch (error) {
-    console.error("Error updating user:", error)
-    return NextResponse.json({ error: "Failed to update user" }, { status: 500 })
+  } catch (err) {
+    console.error("Erro ao atualizar usuário:", err)
+    return NextResponse.json({ error: "Falha ao atualizar usuário" }, { status: 500 })
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = Number.parseInt(params.id)
-
+    const userId = Number(params.id)
     if (!userId) {
       return NextResponse.json({ error: "ID do usuário é obrigatório" }, { status: 400 })
     }
 
-    // Check if user exists and is not admin
-    const user = await sql`
-      SELECT role FROM usuarios WHERE id = ${userId}
-    `
-
-    if (user.length === 0) {
+    const user = await sql`SELECT role FROM public.usuarios WHERE id = ${userId}`
+    if (!user.length) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
-
     if (user[0].role === "admin") {
       return NextResponse.json({ error: "Não é possível excluir usuários administradores" }, { status: 403 })
     }
 
-    // Delete user
-    await sql`
-      DELETE FROM usuarios WHERE id = ${userId}
-    `
-
+    await sql`DELETE FROM public.usuarios WHERE id = ${userId}`
     return NextResponse.json({ message: "Usuário excluído com sucesso" })
-  } catch (error) {
-    console.error("Error deleting user:", error)
-    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 })
+  } catch (err) {
+    console.error("Erro ao excluir usuário:", err)
+    return NextResponse.json({ error: "Falha ao excluir usuário" }, { status: 500 })
   }
 }

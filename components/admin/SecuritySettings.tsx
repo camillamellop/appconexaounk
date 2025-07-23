@@ -1,7 +1,9 @@
 "use client"
 
+import { CardDescription } from "@/components/ui/card"
+
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,7 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
-import { Shield, Key, AlertTriangle, Activity, Lock, Eye, Ban } from "lucide-react"
+import { Shield, Key, AlertTriangle, Activity, Lock, Eye, Ban, ShieldCheck, KeyRound, History } from "lucide-react"
 
 interface SecurityLog {
   id: string
@@ -81,6 +83,8 @@ export default function SecuritySettings() {
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [twoFactor, setTwoFactor] = useState(false)
+  const [sessionTimeout, setSessionTimeout] = useState(false)
 
   useEffect(() => {
     fetchSecurityData()
@@ -273,7 +277,7 @@ export default function SecuritySettings() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Shield className="h-6 w-6" />
+            <ShieldCheck className="h-6 w-6 text-blue-600" />
             Configurações de Segurança
           </h2>
           <p className="text-gray-600">Gerencie políticas de segurança e monitore atividades</p>
@@ -505,6 +509,52 @@ export default function SecuritySettings() {
                     disabled={!settings.account_lockout.enabled}
                   />
                   <p className="text-xs text-gray-500 mt-1">Tempo para resetar contador de tentativas</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Two-factor */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <KeyRound className="h-5 w-5 text-blue-600" />
+                  Autenticação 2 FA
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4 text-muted-foreground" />
+                    <span>Autenticação 2 FA</span>
+                  </div>
+                  <Switch
+                    checked={twoFactor}
+                    onCheckedChange={setTwoFactor}
+                    aria-label="Ativar autenticação de dois fatores"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Session timeout */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-blue-600" />
+                  Encerrar sessão após inatividade
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <History className="h-4 w-4 text-muted-foreground" />
+                    <span>Encerrar sessão após inatividade</span>
+                  </div>
+                  <Switch
+                    checked={sessionTimeout}
+                    onCheckedChange={setSessionTimeout}
+                    aria-label="Ativar timeout de sessão"
+                  />
                 </div>
               </CardContent>
             </Card>
