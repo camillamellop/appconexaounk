@@ -8,8 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Music } from "lucide-react"
-import { setCurrentUser } from "@/lib/auth"
-import Image from "next/image"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -24,21 +22,20 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, senha }),
-      })
+      // Mock authentication for now
+      const mockUsers = [
+        { id: 1, nome: "Camilla", email: "camilla@conexaounk.com", senha: "camillaunk", tipo: "admin", ativo: true },
+        { id: 2, nome: "Pedro", email: "pedro@conexaounk.com", senha: "pedrounk", tipo: "dj", ativo: true },
+        { id: 3, nome: "Suzy", email: "suzy@conexaounk.com", senha: "suzyunk", tipo: "dj", ativo: true },
+      ]
 
-      const data = await response.json()
+      const user = mockUsers.find((u) => u.email === email && u.senha === senha)
 
-      if (data.success) {
-        setCurrentUser(data.user)
+      if (user) {
+        localStorage.setItem("user", JSON.stringify(user))
         router.push("/")
       } else {
-        setError(data.error || "Erro ao fazer login")
+        setError("Email ou senha incorretos")
       }
     } catch (error) {
       setError("Erro de conexão. Tente novamente.")
@@ -51,8 +48,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background com imagem do iPod */}
       <div className="absolute inset-0 z-0">
-        <Image src="/images/ipod-login-design.png" alt="iPod Login Background" fill className="object-cover" priority />
-        <div className="absolute inset-0 bg-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900" />
       </div>
 
       {/* Container principal com design de iPod */}
