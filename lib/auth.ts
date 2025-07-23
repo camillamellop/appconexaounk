@@ -15,13 +15,19 @@ export interface AuthUser {
   last_login?: string
 }
 
-type User = {
-  id: string
-  email: string
-  role: "admin" | "user"
-}
-
+/**
+ * Simple in-memory store.
+ * In production you should replace this with
+ * real authentication (e.g. Supabase, Clerk, NextAuth, etc.).
+ */
 let currentUser: User | null = null
+
+export type User = {
+  id: string
+  name: string
+  email: string
+  role: "admin" | "user" | string
+}
 
 export class AuthService {
   private static readonly SESSION_KEY = "unk_user_session"
@@ -69,7 +75,7 @@ export class AuthService {
       }
 
       // Store session
-      this.setSession(authUser)
+      await this.setSession(authUser)
 
       console.log("✅ [AUTH] Login successful for:", user.nome)
       return authUser
@@ -79,18 +85,13 @@ export class AuthService {
     }
   }
 
-  static logout(): void {
+  static async logout(): Promise<void> {
     console.log("🚪 [AUTH] Logging out user")
 
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(this.SESSION_KEY)
-      sessionStorage.removeItem(this.SESSION_KEY)
-    }
-
-    currentUser = null
+    await this.setCurrentUser(null)
   }
 
-  static getCurrentUser(): AuthUser | null {
+  static async getCurrentUser(): Promise<User | null> {
     if (typeof window === "undefined") {
       return null
     }
@@ -102,17 +103,17 @@ export class AuthService {
         return null
       }
 
-      const user = JSON.parse(sessionData) as AuthUser
-      console.log("👤 [AUTH] Current user:", user.nome)
+      const user = JSON.parse(sessionData) as User
+      console.log("👤 [AUTH] Current user:", user.name)
       return user
     } catch (error) {
       console.error("❌ [AUTH] Error getting current user:", error)
-      this.logout() // Clear corrupted session
+      await this.logout() // Clear corrupted session
       return null
     }
   }
 
-  static setSession(user: AuthUser): void {
+  static async setSession(user: AuthUser): Promise<void> {
     if (typeof window === "undefined") {
       return
     }
@@ -122,39 +123,38 @@ export class AuthService {
     console.log("💾 [AUTH] Session stored for:", user.nome)
   }
 
-  static isAuthenticated(): boolean {
-    return this.getCurrentUser() !== null
+  static async isAuthenticated(): Promise<boolean> {
+    return (await this.getCurrentUser()) !== null
   }
 
-  static isAdmin(): boolean {
-    const user = this.getCurrentUser()
-    return user?.tipo === "admin" || user?.role === "admin" || false
+  static async isAdmin(): Promise<boolean> {
+    const user = await this.getCurrentUser()
+    return user?.role === "admin" || false
   }
 
-  static requireAuth(): AuthUser {
-    const user = this.getCurrentUser()
+  static async requireAuth(): Promise<AuthUser> {
+    const user = await this.getCurrentUser()
     if (!user) {
       throw new Error("Authentication required")
     }
     return user
   }
 
-  static requireAdmin(): AuthUser {
-    const user = this.requireAuth()
-    if (!this.isAdmin()) {
+  static async requireAdmin(): Promise<AuthUser> {
+    const user = await this.requireAuth()
+    if (!(await this.isAdmin())) {
       throw new Error("Admin access required")
     }
     return user
+  }
+
+  /**
+   * Persist a user in the in-memory store (or clear it with `null`).
+   */
+  private static async setCurrentUser(user: User | null): Promise<void> {
+    currentUser = user
   }
 }
 
 // Export default instance
 export const authService = AuthService
-
-// Named re-exports required by the build system
-export const getCurrentUser = AuthService.getCurrentUser
-export const setCurrentUser = AuthService.setSession
-export const isAdmin = AuthService.isAdmin
-export const logout = AuthService.logout
-
-export default AuthService
