@@ -1,7 +1,9 @@
 "use client"
 
+import { CardDescription } from "@/components/ui/card"
+
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,6 +21,7 @@ import {
 } from "@/components/ui/dialog"
 import { Users, UserPlus, Edit, Trash2, Download, Search } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { getCurrentUser, isAdmin } from "@/lib/auth"
 
 interface User {
   id: number
@@ -44,9 +47,12 @@ export default function UserManagement() {
     senha: "",
     role: "user",
   })
+  const [user] = useState(() => getCurrentUser())
 
   useEffect(() => {
-    fetchUsers()
+    if (isAdmin()) {
+      fetchUsers()
+    }
   }, [])
 
   const fetchUsers = async () => {
@@ -187,6 +193,17 @@ export default function UserManagement() {
       weekAgo.setDate(weekAgo.getDate() - 7)
       return new Date(u.created_at) > weekAgo
     }).length,
+  }
+
+  if (!isAdmin()) {
+    return (
+      <Card className="max-w-md mx-auto mt-10">
+        <CardHeader>
+          <CardTitle>Permissão negada</CardTitle>
+        </CardHeader>
+        <CardContent>Você não tem acesso a esta área.</CardContent>
+      </Card>
+    )
   }
 
   if (loading) {

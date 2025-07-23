@@ -1,7 +1,9 @@
 "use client"
 
+import { CardDescription } from "@/components/ui/card"
+
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -429,6 +431,18 @@ export default function SecuritySettings() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Card className="max-w-4xl mx-auto mt-10">
+        <CardHeader>
+          <CardTitle>Segurança</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4">
+            Para reforçar a segurança, recomendamos alterar a senha de todos os usuários a cada 90 dias.
+          </p>
+          <Button>Aplicar política de senha</Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

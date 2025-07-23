@@ -15,6 +15,14 @@ export interface AuthUser {
   last_login?: string
 }
 
+type User = {
+  id: string
+  email: string
+  role: "admin" | "user"
+}
+
+let currentUser: User | null = null
+
 export class AuthService {
   private static readonly SESSION_KEY = "unk_user_session"
 
@@ -78,6 +86,8 @@ export class AuthService {
       localStorage.removeItem(this.SESSION_KEY)
       sessionStorage.removeItem(this.SESSION_KEY)
     }
+
+    currentUser = null
   }
 
   static getCurrentUser(): AuthUser | null {
@@ -141,9 +151,9 @@ export class AuthService {
 // Export default instance
 export const authService = AuthService
 
-// --- named re-exports expected by the build ---
+// Named re-exports required by the build system
 export const getCurrentUser = AuthService.getCurrentUser
-export const setCurrentUser = AuthService.setSession // alias
+export const setCurrentUser = AuthService.setSession
 export const isAdmin = AuthService.isAdmin
 export const logout = AuthService.logout
 
