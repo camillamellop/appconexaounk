@@ -25,16 +25,16 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    unoptimized: true, // Added from updates
+    unoptimized: true,
   },
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
   eslint: {
-    ignoreDuringBuilds: true, // Added from updates
+    ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: true, // Added from updates
+    ignoreBuildErrors: true,
   },
   async headers() {
     return [
@@ -67,7 +67,6 @@ const nextConfig = {
     ]
   },
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // Configurações personalizadas do webpack
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
