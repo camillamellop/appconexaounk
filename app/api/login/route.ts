@@ -1,50 +1,50 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { neonDB } from "@/lib/neon"
-import { cache, CACHE_KEYS } from "@/lib/cache"
-import { handleApiError, createErrorResponse } from "@/lib/error-handler"
+import bcrypt from "bcryptjs"
+import { getSql } from "@/lib/neon"
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, senha } = await request.json()
+    const { email, password } = await request.json()
 
-    if (!email || !senha) {
-      return createErrorResponse("Email e senha são obrigatórios", 400)
+    if (!email || !password) {
+      return NextResponse.json({ error: "Email e senha são obrigatórios" }, { status: 400 })
     }
 
-    // Check cache first
-    const cacheKey = CACHE_KEYS.USER_BY_EMAIL(email)
-    let user = cache.get(cacheKey)
+    const sql = getSql()
 
-    if (!user) {
-      // Fetch from database
-      user = await neonDB.getUsuarioByEmail(email)
+    // Buscar usuário por email
+    const users = await sql`
+      SELECT id, nome, email, senha, tipo, ativo 
+      FROM usuarios 
+      WHERE email = ${email}
+    `
 
-      if (user) {
-        // Cache the user
-        cache.set(cacheKey, user, 5 * 60 * 1000) // 5 minutes
-      }
+    if (users.length === 0) {
+      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
     }
 
-    if (!user) {
-      return createErrorResponse("Usuário não encontrado", 404)
+    const user = users[0]
+
+    if (!user.ativo) {
+      return NextResponse.json({ error: "Conta desativada" }, { status: 401 })
     }
 
-    // Simple password check (in production, use bcrypt)
-    if (user.senha !== senha) {
-      return createErrorResponse("Senha incorreta", 401)
+    // Verificar senha
+    const isValidPassword = await bcrypt.compare(password, user.senha)
+
+    if (!isValidPassword) {
+      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
     }
 
-    // Remove password from response
-    const { senha: _, ...userWithoutPassword } = user
+    // Remover senha do objeto de resposta
+    const { senha, ...userWithoutPassword } = user
 
     return NextResponse.json({
       success: true,
-      message: "Login realizado com sucesso",
       user: userWithoutPassword,
-      timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    const errorResponse = handleApiError(error)
-    return createErrorResponse(errorResponse.message, errorResponse.statusCode)
+    console.error("Erro no login:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
