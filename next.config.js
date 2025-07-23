@@ -29,22 +29,26 @@ const nextConfig = {
     unoptimized: true,
   },
   webpack: (config, { isServer }) => {
-    // Configuração para resolver módulos Node.js no cliente
+    // Only the server bundle should include Node-specific libraries.
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        net: false,
-        tls: false,
-        fs: false,
+        assert: false,
+        buffer: false,
+        child_process: false,
         crypto: false,
-        stream: false,
-        url: false,
-        zlib: false,
+        dns: false,
+        fs: false,
         http: false,
         https: false,
-        assert: false,
+        net: false,
         os: false,
         path: false,
+        pg: false,
+        stream: false,
+        tls: false,
+        url: false,
+        zlib: false,
       }
     }
     return config
