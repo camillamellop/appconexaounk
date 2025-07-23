@@ -111,19 +111,21 @@ export interface Projeto {
 }
 
 export function getSql() {
+  // Priority order for database URLs
   const url =
-    process.env.NEON_NEON_DATABASE_URL ||
+    process.env.NEON_DATABASE_URL ||
+    process.env.DATABASE_URL ||
     process.env.NEON_POSTGRES_URL ||
-    process.env.NEON_POSTGRES_URL_NON_POOLING ||
-    process.env.DATABASE_URL
+    process.env.POSTGRES_URL
 
   if (!url) {
     throw new Error(
-      "❌ Variável de ambiente NEON_DATABASE_URL (ou equivalente) não encontrada. " +
-        "Defina-a no painel da Vercel ou no Neon e faça novo deploy.",
+      "❌ Nenhuma variável de ambiente de banco encontrada. " +
+        "Configure DATABASE_URL, NEON_DATABASE_URL, ou POSTGRES_URL",
     )
   }
 
+  console.log("🔗 [NEON] Using database URL:", url.substring(0, 20) + "...")
   return neon(url)
 }
 
