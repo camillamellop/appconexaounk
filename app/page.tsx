@@ -33,15 +33,17 @@ export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
-    // Check for user in localStorage
     const storedUser = localStorage.getItem("user")
     if (storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser)
+        const parsedUser: User = JSON.parse(storedUser)
         setUser(parsedUser)
-        fetchDashboardStats(parsedUser.id)
+        if (parsedUser.tipo === "admin") {
+          router.push("/admin/dashboard")
+        } else {
+          router.push("/user/dashboard")
+        }
       } catch (error) {
-        console.error("Error parsing stored user:", error)
         router.push("/login")
       }
     } else {
@@ -72,15 +74,18 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-slate-400">Carregando...</p>
+        </div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Redirecionando...</h1>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
@@ -90,7 +95,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-900">
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

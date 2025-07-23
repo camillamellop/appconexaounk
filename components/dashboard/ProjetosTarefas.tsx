@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { FolderOpen, CheckSquare, Plus, Calendar, Clock } from "lucide-react"
+import { FolderOpen, CheckSquare, Plus, Calendar, Music } from "lucide-react"
 import { getCurrentUser } from "@/lib/auth"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { Progress } from "@/components/ui/progress"
 
 interface Projeto {
   id: number
@@ -113,6 +114,30 @@ export default function ProjetosTarefas() {
     }
   }
 
+  const tarefasMock = [
+    {
+      id: 1,
+      titulo: "Finalizar remix do Track A",
+      prioridade: "alta",
+      prazo: "Urgente • Vence amanhã",
+      cor: "bg-red-500",
+    },
+    {
+      id: 2,
+      titulo: "Campanha redes sociais",
+      prioridade: "alta",
+      prazo: "Alta • 3 dias restantes",
+      cor: "bg-purple-500",
+    },
+    {
+      id: 3,
+      titulo: "Comprar cabo XLR",
+      prioridade: "media",
+      prazo: "Média • Sem prazo",
+      cor: "bg-blue-500",
+    },
+  ]
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -143,28 +168,22 @@ export default function ProjetosTarefas() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Projetos */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <FolderOpen className="h-5 w-5" />
-                Projetos
-              </CardTitle>
-              <CardDescription>Seus projetos ativos e em andamento</CardDescription>
-            </div>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Novo
-            </Button>
-          </div>
+      <Card className="bg-gray-800 border-gray-700">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-white flex items-center gap-2">
+            <FolderOpen className="h-5 w-5 text-purple-400" />
+            Projetos
+          </CardTitle>
+          <Button size="sm" className="bg-gray-700 hover:bg-gray-600 text-white border-gray-600">
+            <Plus className="h-4 w-4" />
+          </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {projetos.length === 0 ? (
             <div className="text-center py-8">
               <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500 mb-4">Nenhum projeto encontrado</p>
-              <Button size="sm">
+              <Button size="sm" className="bg-gray-700 hover:bg-gray-600 text-white border-gray-600">
                 <Plus className="h-4 w-4 mr-2" />
                 Criar primeiro projeto
               </Button>
@@ -207,28 +226,22 @@ export default function ProjetosTarefas() {
       </Card>
 
       {/* Tarefas */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <CheckSquare className="h-5 w-5" />
-                Tarefas
-              </CardTitle>
-              <CardDescription>Suas tarefas recentes e pendentes</CardDescription>
-            </div>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova
-            </Button>
-          </div>
+      <Card className="bg-gray-800 border-gray-700">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-white flex items-center gap-2">
+            <Music className="h-5 w-5 text-purple-400" />
+            Tarefas
+          </CardTitle>
+          <Button size="sm" className="bg-gray-700 hover:bg-gray-600 text-white border-gray-600">
+            <Plus className="h-4 w-4" />
+          </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {tarefas.length === 0 ? (
             <div className="text-center py-8">
               <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500 mb-4">Nenhuma tarefa encontrada</p>
-              <Button size="sm">
+              <Button size="sm" className="bg-gray-700 hover:bg-gray-600 text-white border-gray-600">
                 <Plus className="h-4 w-4 mr-2" />
                 Criar primeira tarefa
               </Button>
@@ -236,39 +249,33 @@ export default function ProjetosTarefas() {
           ) : (
             <div className="space-y-3">
               {tarefas.map((tarefa) => (
-                <div key={tarefa.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium text-sm">{tarefa.titulo}</h4>
-                    <div className="flex gap-1">
-                      <Badge className={getPrioridadeColor(tarefa.prioridade)} variant="secondary">
-                        {tarefa.prioridade}
-                      </Badge>
-                      <Badge className={getTaskStatusColor(tarefa.status)} variant="secondary">
-                        {tarefa.status}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    {tarefa.projeto && <span className="text-purple-600 font-medium">{tarefa.projeto.nome}</span>}
-
-                    {tarefa.data_vencimento && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {format(parseISO(tarefa.data_vencimento), "dd/MM", { locale: ptBR })}
-                      </span>
-                    )}
+                <div key={tarefa.id} className="flex items-center gap-3 p-3 bg-gray-700/50 rounded-lg">
+                  <div className={`w-2 h-2 rounded-full ${getPrioridadeColor(tarefa.prioridade)}`} />
+                  <div className="flex-1">
+                    <p className="text-white font-medium">{tarefa.titulo}</p>
+                    <p className="text-gray-400 text-sm">
+                      {tarefa.data_vencimento
+                        ? format(parseISO(tarefa.data_vencimento), "dd/MM", { locale: ptBR })
+                        : "Sem prazo"}
+                    </p>
                   </div>
                 </div>
               ))}
-
-              {tarefas.length >= 8 && (
-                <Button variant="ghost" className="w-full text-sm">
-                  Ver todas as tarefas
-                </Button>
-              )}
             </div>
           )}
+
+          <div className="pt-4 border-t border-gray-700">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-300 text-sm">Progresso geral</span>
+              <span className="text-purple-400 text-sm font-medium">65%</span>
+            </div>
+            <Progress value={65} className="h-2 bg-gray-700">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all"
+                style={{ width: "65%" }}
+              />
+            </Progress>
+          </div>
         </CardContent>
       </Card>
     </div>
