@@ -1,56 +1,78 @@
--- Verificar estrutura da tabela usuarios
+-- Script para verificar se a tabela usuarios está funcionando corretamente
+
+-- Verificar se a tabela existe
 SELECT 
-  column_name,
-  data_type,
-  is_nullable,
-  column_default
+    table_name,
+    table_type,
+    table_schema
+FROM information_schema.tables 
+WHERE table_name = 'usuarios';
+
+-- Verificar todas as colunas e seus tipos
+SELECT 
+    column_name,
+    data_type,
+    character_maximum_length,
+    is_nullable,
+    column_default
 FROM information_schema.columns 
 WHERE table_name = 'usuarios' 
-  AND table_schema = 'public'
 ORDER BY ordinal_position;
 
--- Verificar todos os usuários cadastrados
+-- Verificar índices criados
 SELECT 
-  id,
-  nome,
-  email,
-  tipo,
-  cargo,
-  ativo,
-  created_at
-FROM usuarios
-ORDER BY nome;
+    indexname,
+    indexdef
+FROM pg_indexes 
+WHERE tablename = 'usuarios';
 
--- Verificar eventos por usuário
+-- Verificar políticas RLS
 SELECT 
-  u.nome as usuario,
-  COUNT(a.id) as total_eventos
-FROM usuarios u
-LEFT JOIN agenda a ON u.id = a.usuario_id
-GROUP BY u.id, u.nome
-ORDER BY u.nome;
+    schemaname,
+    tablename,
+    policyname,
+    permissive,
+    roles,
+    cmd,
+    qual
+FROM pg_policies 
+WHERE tablename = 'usuarios';
 
--- Verificar tarefas por usuário
+-- Verificar triggers
 SELECT 
-  u.nome as usuario,
-  COUNT(t.id) as total_tarefas
-FROM usuarios u
-LEFT JOIN tarefas t ON u.id = t.usuario_id
-GROUP BY u.id, u.nome
-ORDER BY u.nome;
+    trigger_name,
+    event_manipulation,
+    action_timing,
+    action_statement
+FROM information_schema.triggers 
+WHERE event_object_table = 'usuarios';
 
--- Resumo geral
+-- Contar registros por status
 SELECT 
-  'Total de usuários' as categoria,
-  COUNT(*) as quantidade
-FROM usuarios
-UNION ALL
+    ativo,
+    COUNT(*) as quantidade
+FROM usuarios 
+GROUP BY ativo;
+
+-- Verificar integridade dos dados obrigatórios
 SELECT 
-  'Total de eventos',
-  COUNT(*)
-FROM agenda
-UNION ALL
+    'Verificação de Integridade' as teste,
+    COUNT(*) as total_usuarios,
+    COUNT(CASE WHEN nome IS NOT NULL AND nome != '' THEN 1 END) as nomes_validos,
+    COUNT(CASE WHEN email IS NOT NULL AND email != '' THEN 1 END) as emails_validos,
+    COUNT(CASE WHEN senha IS NOT NULL AND senha != '' THEN 1 END) as senhas_validas,
+    COUNT(CASE WHEN tipo IS NOT NULL AND tipo != '' THEN 1 END) as tipos_validos
+FROM usuarios;
+
+-- Verificar emails únicos
 SELECT 
-  'Total de tarefas',
-  COUNT(*)
-FROM tarefas;
+    'Verificação de Emails Únicos' as teste,
+    COUNT(email) as total_emails,
+    COUNT(DISTINCT email) as emails_unicos,
+    CASE 
+        WHEN COUNT(email) = COUNT(DISTINCT email) THEN '✅ Todos únicos'
+        ELSE '❌ Emails duplicados encontrados'
+    END as status
+FROM usuarios;
+
+SELECT '✅ Verificação da tabela usuarios concluída!' as resultado;

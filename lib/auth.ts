@@ -1,123 +1,192 @@
-import { supabase } from "./supabase"
-import type { User } from "./types"
+import { neonDB } from "@/lib/neon"
 
-const USER_STORAGE_KEY = "unk_current_user"
+export interface LoginCredentials {
+  email: string
+  senha: string
+}
 
-export async function testSupabaseConnection(): Promise<boolean> {
+export interface LoginResult {
+  success: boolean
+  message?: string
+  user?: any
+}
+
+export interface User {
+  id: string
+  nome: string
+  email: string
+  tipo_usuario: string
+  ativo: boolean
+}
+
+// Chave para localStorage
+const USER_STORAGE_KEY = "currentUser"
+const LOGIN_TIMESTAMP_KEY = "loginTimestamp"
+
+// Duração da sessão (24 horas em milissegundos)
+const SESSION_DURATION = 24 * 60 * 60 * 1000
+
+// Função de login
+export async function login(credentials: LoginCredentials): Promise<LoginResult> {
   try {
-    console.log("🔍 Testing Supabase connection...")
-    const { data, error } = await supabase.from("usuarios").select("count").limit(1)
+    console.log("🔐 Tentando fazer login com:", credentials.email)
 
-    if (error) {
-      console.error("❌ Supabase connection error:", error.message)
-      return false
+    // Buscar usuário no banco
+    const usuario = await neonDB.getUsuarioByEmail(credentials.email)
+
+    if (!usuario) {
+      console.log("❌ Usuário não encontrado")
+      return {
+        success: false,
+        message: "Email não encontrado",
+      }
     }
 
-    console.log("✅ Supabase connection successful")
-    return true
+    if (!usuario.ativo) {
+      console.log("❌ Usuário inativo")
+      return {
+        success: false,
+        message: "Usuário inativo",
+      }
+    }
+
+    // Verificar senha (em produção, use hash)
+    if (usuario.senha !== credentials.senha) {
+      console.log("❌ Senha incorreta")
+      return {
+        success: false,
+        message: "Senha incorreta",
+      }
+    }
+
+    // Criar objeto do usuário sem a senha
+    const userSession = {
+      id: usuario.id,
+      nome: usuario.nome,
+      email: usuario.email,
+      tipo_usuario: usuario.tipo_usuario,
+      ativo: usuario.ativo,
+    }
+
+    // Salvar no localStorage
+    setCurrentUser(userSession)
+
+    console.log("✅ Login realizado com sucesso para:", usuario.nome)
+
+    return {
+      success: true,
+      message: "Login realizado com sucesso",
+      user: userSession,
+    }
   } catch (error) {
-    console.error("❌ Supabase connection error:", error)
-    return false
+    console.error("💥 Erro no login:", error)
+    return {
+      success: false,
+      message: "Erro interno do servidor",
+    }
   }
 }
 
-export async function listAllUsers(): Promise<User[]> {
+// Função para salvar usuário atual
+export function setCurrentUser(user: User): void {
   try {
-    const { data, error } = await supabase.from("usuarios").select("*").order("nome")
-
-    if (error) {
-      console.error("Erro ao listar usuários:", error)
-      return []
-    }
-
-    return data || []
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
+    localStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
+    console.log("💾 Usuário salvo no localStorage:", user.nome)
   } catch (error) {
-    console.error("Erro ao listar usuários:", error)
-    return []
+    console.error("Erro ao salvar usuário:", error)
   }
 }
 
-export async function login(email: string): Promise<User | null> {
-  try {
-    console.log("🔐 Attempting login for:", email)
-
-    const { data, error } = await supabase.from("usuarios").select("*").ilike("email", email.trim()).single()
-
-    if (error) {
-      console.error("❌ Login error:", error.message)
-      return null
-    }
-
-    if (!data) {
-      console.log("❌ User not found")
-      return null
-    }
-
-    // Salvar usuário no localStorage
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data))
-    console.log("✅ Login successful for:", data.nome)
-
-    return data
-  } catch (error) {
-    console.error("❌ Login exception:", error)
-    return null
-  }
-}
-
+// Função para obter usuário atual
 export function getCurrentUser(): User | null {
   try {
-    if (typeof window === "undefined") return null
+    const userStr = localStorage.getItem(USER_STORAGE_KEY)
+    const timestampStr = localStorage.getItem(LOGIN_TIMESTAMP_KEY)
 
-    const userData = localStorage.getItem(USER_STORAGE_KEY)
-    if (!userData) return null
-
-    const user = JSON.parse(userData)
-
-    // Validar se o objeto tem as propriedades necessárias
-    if (!user.id || !user.email || !user.nome) {
-      console.warn("⚠️ Invalid user data in localStorage, clearing...")
-      localStorage.removeItem(USER_STORAGE_KEY)
+    if (!userStr || !timestampStr) {
       return null
     }
 
-    return user
+    // Verificar se a sessão expirou
+    const loginTime = Number.parseInt(timestampStr)
+    const now = Date.now()
+
+    if (now - loginTime > SESSION_DURATION) {
+      console.log("⏰ Sessão expirada")
+      clearCurrentUser()
+      return null
+    }
+
+    return JSON.parse(userStr) as User
   } catch (error) {
-    console.error("❌ Error getting current user:", error)
-    localStorage.removeItem(USER_STORAGE_KEY)
+    console.error("Erro ao obter usuário:", error)
     return null
   }
 }
 
-export function logout(): void {
+// Função para limpar usuário atual
+export function clearCurrentUser(): void {
   try {
     localStorage.removeItem(USER_STORAGE_KEY)
-    console.log("✅ User logged out successfully")
-
-    // Forçar reload da página para limpar qualquer estado
-    if (typeof window !== "undefined") {
-      window.location.href = "/login"
-    }
+    localStorage.removeItem(LOGIN_TIMESTAMP_KEY)
+    console.log("🗑️ Usuário removido do localStorage")
   } catch (error) {
-    console.error("❌ Error during logout:", error)
+    console.error("Erro ao limpar usuário:", error)
   }
 }
 
+// Função para fazer logout
+export function logout(): void {
+  clearCurrentUser()
+  console.log("👋 Logout realizado")
+}
+
+// Função para verificar se está autenticado
 export function isAuthenticated(): boolean {
   const user = getCurrentUser()
   return user !== null
 }
 
+// Função para verificar se é admin
 export function isAdmin(): boolean {
   const user = getCurrentUser()
-  return user?.tipo === "admin"
+  return user?.tipo_usuario === "admin"
 }
 
+// Função para verificar se é DJ
 export function isDJ(): boolean {
   const user = getCurrentUser()
-  return user?.tipo === "dj"
+  return user?.tipo_usuario === "dj"
 }
 
-export function getUserType(): string {
+// Função para verificar se é produtor
+export function isProducer(): boolean {
   const user = getCurrentUser()
-  return user?.tipo || "guest"
+  return user?.tipo_usuario === "produtor" || user?.tipo_usuario === "produtora"
+}
+
+// Função para verificar se é manager
+export function isManager(): boolean {
+  const user = getCurrentUser()
+  return user?.tipo_usuario === "manager"
+}
+
+// Função para manter sessão ativa
+export function maintainSession(): void {
+  const user = getCurrentUser()
+  if (user) {
+    // Atualizar timestamp da sessão
+    localStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
+  }
+}
+
+// Função para restaurar sessão
+export function restoreSession(): User | null {
+  const user = getCurrentUser()
+  if (user) {
+    console.log("🔄 Sessão restaurada para:", user.nome)
+    maintainSession()
+  }
+  return user
 }

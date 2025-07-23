@@ -25,13 +25,19 @@ export default function Header() {
 
   if (!user) return null
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
+  // Safely build the two-letter initials shown in the avatar fallback.
+  const getInitials = (name?: string) => {
+    // If name is falsy or not a string, show a default “U” (for “Usuário”)
+    if (!name || typeof name !== "string") return "U"
+    const initials = name
+      .trim()
+      .split(/\s+/) // handle multiple spaces
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2)
+
+    return initials || "U"
   }
 
   const getUserTypeLabel = (tipo: string) => {

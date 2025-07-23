@@ -1,80 +1,91 @@
 "use client"
 
 import type React from "react"
+
 import { useEffect, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { getCurrentUser } from "@/lib/auth"
-import type { Usuario } from "@/lib/supabase"
+import { useRouter, usePathname } from "next/navigation"
+import { restoreSession, isAuthenticated, maintainSession } from "@/lib/auth"
+import type { Usuario } from "@/lib/auth"
 
 interface AuthWrapperProps {
   children: React.ReactNode
 }
 
 export default function AuthWrapper({ children }: AuthWrapperProps) {
-  const [user, setUser] = useState<Usuario | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const pathname = usePathname()
+  const [user, setUser] = useState<Usuario | null>(null)
   const router = useRouter()
-  const isLoginPage = pathname === "/login"
+  const pathname = usePathname()
 
   useEffect(() => {
-    const checkAuth = () => {
+    const initializeAuth = async () => {
       try {
-        const currentUser = getCurrentUser()
-        console.log("Current user:", currentUser) // Debug log
+        console.log("🔐 Initializing authentication...")
 
-        setUser(currentUser)
-        setIsLoading(false)
+        // Tentar restaurar sessão existente
+        const restoredUser = restoreSession()
 
-        // Se não há usuário e não está na página de login, redirecionar
-        if (!currentUser && !isLoginPage) {
-          console.log("No user found, redirecting to login") // Debug log
-          router.push("/login")
-          return
-        }
+        if (restoredUser) {
+          console.log("✅ Session restored:", restoredUser.nome)
+          setUser(restoredUser)
 
-        // Se há usuário e está na página de login, redirecionar para home
-        if (currentUser && isLoginPage) {
-          console.log("User found on login page, redirecting to home") // Debug log
-          router.push("/")
-          return
+          // Buscar dados atualizados em background
+          try {
+            const updatedUser = await maintainSession()
+            if (updatedUser) {
+              setUser(updatedUser)
+            }
+          } catch (error) {
+            console.warn("⚠️ Could not refresh user data:", error)
+          }
+        } else {
+          console.log("ℹ️ No session to restore")
+          setUser(null)
         }
       } catch (error) {
-        console.error("Error checking auth:", error)
+        console.error("❌ Error initializing auth:", error)
         setUser(null)
+      } finally {
         setIsLoading(false)
-        if (!isLoginPage) {
-          router.push("/login")
-        }
       }
     }
 
-    checkAuth()
-  }, [pathname, router, isLoginPage])
+    initializeAuth()
+  }, [])
 
-  // Loading state
+  useEffect(() => {
+    if (isLoading) return
+
+    const isLoginPage = pathname === "/login"
+    const userIsAuthenticated = isAuthenticated()
+
+    console.log("🔍 Auth check:", {
+      pathname,
+      isLoginPage,
+      userIsAuthenticated,
+      hasUser: !!user,
+    })
+
+    if (!isLoginPage && !userIsAuthenticated) {
+      console.log("🚫 Not authenticated, redirecting to login")
+      router.push("/login")
+    } else if (isLoginPage && userIsAuthenticated) {
+      console.log("✅ Already authenticated, redirecting to dashboard")
+      router.push("/")
+    }
+  }, [isLoading, pathname, user, router])
+
+  // Mostrar loading enquanto verifica autenticação
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
-        <div className="text-white text-lg">Carregando...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-white/70 text-sm">Verificando sessão...</p>
+        </div>
       </div>
     )
   }
 
-  // Login page - render without layout
-  if (isLoginPage) {
-    return <>{children}</>
-  }
-
-  // Protected pages - only render if user is authenticated
-  if (user) {
-    return <>{children}</>
-  }
-
-  // Fallback - should not reach here due to redirect
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
-      <div className="text-white text-lg">Redirecionando...</div>
-    </div>
-  )
+  return <>{children}</>
 }

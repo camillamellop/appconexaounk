@@ -109,6 +109,10 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const handleSave = () => {
     setUserProfile(formData)
     setUserSettings(settings)
+
+    // Show success feedback
+    console.log("✅ Configurações salvas:", settings)
+
     onClose()
   }
 
@@ -345,6 +349,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                       <Switch
                         checked={settings.notifications.push}
                         onCheckedChange={(value) => handleNotificationChange("push", value)}
+                        className="data-[state=checked]:bg-purple-600"
                       />
                     </div>
 
@@ -356,6 +361,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                       <Switch
                         checked={settings.notifications.email}
                         onCheckedChange={(value) => handleNotificationChange("email", value)}
+                        className="data-[state=checked]:bg-purple-600"
                       />
                     </div>
                   </div>
@@ -381,9 +387,15 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-700 border-slate-600">
-                          <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
-                          <SelectItem value="en-US">English (US)</SelectItem>
-                          <SelectItem value="es-ES">Español</SelectItem>
+                          <SelectItem value="pt-BR" className="text-white hover:bg-slate-600">
+                            Português (Brasil)
+                          </SelectItem>
+                          <SelectItem value="en-US" className="text-white hover:bg-slate-600">
+                            English (US)
+                          </SelectItem>
+                          <SelectItem value="es-ES" className="text-white hover:bg-slate-600">
+                            Español
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -398,9 +410,15 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-700 border-slate-600">
-                          <SelectItem value="America/Sao_Paulo">São Paulo (GMT-3)</SelectItem>
-                          <SelectItem value="America/New_York">New York (GMT-5)</SelectItem>
-                          <SelectItem value="Europe/London">London (GMT+0)</SelectItem>
+                          <SelectItem value="America/Sao_Paulo" className="text-white hover:bg-slate-600">
+                            São Paulo (GMT-3)
+                          </SelectItem>
+                          <SelectItem value="America/New_York" className="text-white hover:bg-slate-600">
+                            New York (GMT-5)
+                          </SelectItem>
+                          <SelectItem value="Europe/London" className="text-white hover:bg-slate-600">
+                            London (GMT+0)
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

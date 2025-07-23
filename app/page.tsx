@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { getCurrentUser, isAdmin, isDJ } from "@/lib/auth"
-import type { Usuario } from "@/lib/supabase"
+import type { Usuario } from "@/lib/neon"
 import Header from "@/components/layout/Header"
 import BottomNavigation from "@/components/layout/BottomNavigation"
 import Hoje from "@/components/dashboard/Hoje"
@@ -49,7 +49,7 @@ export default function HomePage() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Olá, {user.nome.split(" ")[0]}! 👋</h1>
+              <h1 className="text-3xl font-bold text-white mb-2">Olá, {user?.nome?.split(" ")[0] ?? "Usuário"}! 👋</h1>
               <p className="text-slate-400">
                 {userIsAdmin && "Painel administrativo - "}
                 {userIsDJ && "Painel do DJ - "}

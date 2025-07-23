@@ -1,251 +1,285 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { useState, useMemo } from "react"
+import { Calendar, dateFnsLocalizer } from "react-big-calendar"
+import { format, parse, startOfWeek, getDay } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight, Filter } from "lucide-react"
-import type { CalendarEvent } from "@/lib/agenda-types"
+import { useAgendaEvents } from "@/hooks/useNeon"
 import { isAdmin } from "@/lib/auth"
+import { CalendarIcon } from "lucide-react"
+import "react-big-calendar/lib/css/react-big-calendar.css"
 
-interface CalendarViewProps {
-  events: CalendarEvent[]
-  onEventClick: (event: CalendarEvent) => void
-  onAddEvent: (date: Date) => void
-  users?: any[]
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales: { "pt-BR": ptBR },
+})
+
+const messages = {
+  allDay: "Dia inteiro",
+  previous: "Anterior",
+  next: "Próximo",
+  today: "Hoje",
+  month: "Mês",
+  week: "Semana",
+  day: "Dia",
+  agenda: "Agenda",
+  date: "Data",
+  time: "Hora",
+  event: "Evento",
+  noEventsInRange: "Não há eventos neste período.",
+  showMore: (total: number) => `+ Ver mais (${total})`,
 }
 
-export default function CalendarView({ events, onEventClick, onAddEvent, users = [] }: CalendarViewProps) {
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedUser, setSelectedUser] = useState<string>("all")
+interface CalendarViewProps {
+  selectedDate?: Date
+  onDateSelect?: (date: Date) => void
+}
+
+export default function CalendarView({ selectedDate, onDateSelect }: CalendarViewProps) {
+  const { events, loading, error } = useAgendaEvents()
+  const [selectedDJ, setSelectedDJ] = useState<string>("all")
   const userIsAdmin = isAdmin()
 
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ]
-
-  const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear()
-    const month = date.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    const daysInMonth = lastDay.getDate()
-    const startingDayOfWeek = firstDay.getDay()
-
-    const days = []
-
-    // Previous month days
-    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
-      const prevDate = new Date(year, month, -i)
-      days.push({ date: prevDate, isCurrentMonth: false })
-    }
-
-    // Current month days
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day)
-      days.push({ date, isCurrentMonth: true })
-    }
-
-    // Next month days to fill the grid
-    const remainingDays = 42 - days.length
-    for (let day = 1; day <= remainingDays; day++) {
-      const nextDate = new Date(year, month + 1, day)
-      days.push({ date: nextDate, isCurrentMonth: false })
-    }
-
-    return days
+  // Cores para cada DJ
+  const djColors = {
+    "suzy@conexaounk.com": "#8B5CF6", // Purple
+    "pedro@conexaounk.com": "#06B6D4", // Cyan
+    "gustavo@conexaounk.com": "#10B981", // Emerald
+    "camilla@conexaounk.com": "#F59E0B", // Amber
   }
 
-  const navigateMonth = (direction: "prev" | "next") => {
-    setCurrentDate((prev) => {
-      const newDate = new Date(prev)
-      if (direction === "prev") {
-        newDate.setMonth(prev.getMonth() - 1)
-      } else {
-        newDate.setMonth(prev.getMonth() + 1)
+  // Filtrar eventos por DJ selecionado
+  const filteredEvents = useMemo(() => {
+    if (selectedDJ === "all") return events
+    return events.filter((event) => event.usuario?.email === selectedDJ)
+  }, [events, selectedDJ])
+
+  // Converter eventos para formato do calendário
+  const calendarEvents = useMemo(() => {
+    return filteredEvents.map((event) => {
+      // Compatibilidade: aceita data_evento (legado) ou data_inicio (Neon).
+      const startDate = new Date(event.data_evento ?? event.data_inicio)
+
+      // Se tem hora de início, usar ela
+      if (event.hora_inicio) {
+        const [hours, minutes] = event.hora_inicio.split(":")
+        startDate.setHours(Number.parseInt(hours), Number.parseInt(minutes))
       }
-      return newDate
+
+      // Data de fim (mesmo dia por padrão)
+      const endDate = new Date(startDate)
+      if (event.hora_fim) {
+        const [hours, minutes] = event.hora_fim.split(":")
+        endDate.setHours(Number.parseInt(hours), Number.parseInt(minutes))
+      } else {
+        // Se não tem hora fim, adicionar 2 horas
+        endDate.setHours(endDate.getHours() + 2)
+      }
+
+      const djEmail = event.usuario?.email || ""
+      const color = djColors[djEmail as keyof typeof djColors] || "#6B7280"
+
+      return {
+        id: event.id,
+        title: event.titulo,
+        start: startDate,
+        end: endDate,
+        resource: {
+          ...event,
+          color,
+        },
+      }
     })
-  }
+  }, [filteredEvents])
 
-  const goToToday = () => {
-    setCurrentDate(new Date())
-  }
+  // Obter lista única de DJs
+  const availableDJs = useMemo(() => {
+    const djSet = new Set()
+    events.forEach((event) => {
+      if (event.usuario) {
+        djSet.add(
+          JSON.stringify({
+            email: event.usuario.email,
+            nome: event.usuario.nome,
+          }),
+        )
+      }
+    })
+    return Array.from(djSet).map((dj) => JSON.parse(dj as string))
+  }, [events])
 
-  const getEventsForDate = (date: Date) => {
-    let filteredEvents = events.filter((event) => event.date.toDateString() === date.toDateString())
-
-    // Filtrar por usuário se admin selecionou um usuário específico
-    if (userIsAdmin && selectedUser !== "all") {
-      filteredEvents = filteredEvents.filter((event) => event.usuario_id === selectedUser)
+  // Estilo personalizado para eventos
+  const eventStyleGetter = (event: any) => {
+    const backgroundColor = event.resource?.color || "#6B7280"
+    return {
+      style: {
+        backgroundColor,
+        borderRadius: "4px",
+        opacity: 0.8,
+        color: "white",
+        border: "0px",
+        display: "block",
+        fontSize: "12px",
+        padding: "2px 4px",
+      },
     }
-
-    return filteredEvents
   }
 
-  const getUserColor = (userId: string) => {
-    const colors = ["bg-blue-600", "bg-green-600", "bg-purple-600", "bg-orange-600", "bg-pink-600", "bg-indigo-600"]
-    const index = users.findIndex((user) => user.id === userId)
-    return colors[index % colors.length] || "bg-gray-600"
+  // Componente customizado para eventos
+  const EventComponent = ({ event }: { event: any }) => {
+    const eventData = event.resource
+    return (
+      <div className="text-xs">
+        <div className="font-medium truncate">{event.title}</div>
+        {userIsAdmin && eventData.usuario && (
+          <div className="text-white/80 truncate">{eventData.usuario.nome.split(" ")[0]}</div>
+        )}
+        {eventData.local && <div className="text-white/70 truncate">📍 {eventData.local}</div>}
+      </div>
+    )
   }
 
-  const getUserName = (userId: string) => {
-    const user = users.find((u) => u.id === userId)
-    return user?.nome || "Usuário"
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
-  const days = getDaysInMonth(currentDate)
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-red-500">
+            <p>Erro ao carregar eventos: {error}</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
-    <Card className="bg-slate-800 border-slate-700">
-      <CardContent className="p-6">
-        {/* Calendar Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white">
-            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-          </h2>
+    <div className="space-y-4">
+      {/* Filtros e Controles */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              Calendário de Eventos
+              {userIsAdmin && (
+                <Badge variant="destructive" className="text-xs">
+                  Admin View
+                </Badge>
+              )}
+            </CardTitle>
 
-          <div className="flex items-center gap-4">
-            {/* Filtro por usuário (apenas para admin) */}
-            {userIsAdmin && users.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-slate-400" />
-                <Select value={selectedUser} onValueChange={setSelectedUser}>
-                  <SelectTrigger className="w-48 bg-slate-700 border-slate-600 text-white">
-                    <SelectValue placeholder="Filtrar por DJ" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
-                    <SelectItem value="all" className="text-white">
-                      Todos os DJs
+            {/* Filtro por DJ (apenas para admin) */}
+            {userIsAdmin && availableDJs.length > 0 && (
+              <Select value={selectedDJ} onValueChange={setSelectedDJ}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filtrar por DJ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os DJs</SelectItem>
+                  {availableDJs.map((dj) => (
+                    <SelectItem key={dj.email} value={dj.email}>
+                      {dj.nome}
                     </SelectItem>
-                    {users
-                      .filter((user) => user.tipo === "dj")
-                      .map((user) => (
-                        <SelectItem key={user.id} value={user.id} className="text-white">
-                          {user.nome}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="border-slate-600 text-slate-400 hover:text-white bg-transparent"
-                onClick={() => navigateMonth("prev")}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-
-              <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={goToToday}>
-                Today
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="border-slate-600 text-slate-400 hover:text-white bg-transparent"
-                onClick={() => navigateMonth("next")}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Days of Week Header */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {daysOfWeek.map((day) => (
-            <div key={day} className="p-2 text-center text-slate-400 font-medium">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-1">
-          {days.map((day, index) => {
-            const dayEvents = getEventsForDate(day.date)
-            const isToday = day.date.toDateString() === new Date().toDateString()
-
-            return (
-              <div
-                key={index}
-                className={`min-h-[100px] p-2 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors ${
-                  !day.isCurrentMonth ? "opacity-50" : ""
-                } ${isToday ? "bg-purple-900/30 border-purple-600" : "bg-slate-800"}`}
-                onClick={() => onAddEvent(day.date)}
-              >
-                <div className={`text-sm font-medium mb-1 ${isToday ? "text-purple-400" : "text-white"}`}>
-                  {day.date.getDate()}
-                </div>
-
-                <div className="space-y-1">
-                  {dayEvents.slice(0, 3).map((event) => (
-                    <div
-                      key={event.id}
-                      className={`text-xs p-1 rounded cursor-pointer ${
-                        event.type === "gig"
-                          ? "bg-green-600 text-white"
-                          : event.type === "meeting"
-                            ? "bg-blue-600 text-white"
-                            : "bg-purple-600 text-white"
-                      }`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onEventClick(event)
-                      }}
-                    >
-                      <div className="truncate font-medium">{event.title}</div>
-                      {userIsAdmin && event.usuarios && (
-                        <div className="text-xs opacity-75 truncate">{event.usuarios.nome}</div>
-                      )}
-                    </div>
                   ))}
-                  {dayEvents.length > 3 && <div className="text-xs text-slate-400">+{dayEvents.length - 3} more</div>}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        </CardHeader>
 
-        {/* Legenda para admin */}
-        {userIsAdmin && users.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-slate-700">
-            <h3 className="text-sm font-medium text-slate-400 mb-3">DJs:</h3>
-            <div className="flex flex-wrap gap-2">
-              {users
-                .filter((user) => user.tipo === "dj")
-                .map((user) => (
-                  <Badge
-                    key={user.id}
-                    variant="outline"
-                    className={`${getUserColor(user.id)} text-white border-transparent`}
-                  >
-                    {user.nome}
-                  </Badge>
-                ))}
+        <CardContent>
+          {/* Legenda de cores (apenas para admin) */}
+          {userIsAdmin && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {availableDJs.map((dj) => {
+                const color = djColors[dj.email as keyof typeof djColors] || "#6B7280"
+                return (
+                  <div key={dj.email} className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                    <span className="text-xs text-gray-600">{dj.nome}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Calendário */}
+          <div className="h-[600px]">
+            <Calendar
+              localizer={localizer}
+              events={calendarEvents}
+              startAccessor="start"
+              endAccessor="end"
+              messages={messages}
+              culture="pt-BR"
+              eventPropGetter={eventStyleGetter}
+              components={{
+                event: EventComponent,
+              }}
+              onSelectEvent={(event) => {
+                console.log("Event selected:", event)
+                // Aqui você pode abrir um modal com detalhes do evento
+              }}
+              onSelectSlot={(slotInfo) => {
+                if (onDateSelect) {
+                  onDateSelect(slotInfo.start)
+                }
+              }}
+              selectable
+              popup
+              step={30}
+              timeslots={2}
+              defaultView="month"
+              views={["month", "week", "day", "agenda"]}
+              style={{ height: "100%" }}
+            />
+          </div>
+
+          {/* Estatísticas */}
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600">{filteredEvents.length}</div>
+              <div className="text-sm text-gray-600">Total de Eventos</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {filteredEvents.filter((e) => e.status === "confirmado").length}
+              </div>
+              <div className="text-sm text-gray-600">Confirmados</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">
+                {filteredEvents.filter((e) => e.status === "pendente").length}
+              </div>
+              <div className="text-sm text-gray-600">Pendentes</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{availableDJs.length}</div>
+              <div className="text-sm text-gray-600">DJs Ativos</div>
             </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

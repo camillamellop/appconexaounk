@@ -4,6 +4,9 @@ import type React from "react"
 import { useState, useRef, useCallback, useEffect } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { ArrowLeft } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 export default function UNKProfileCard() {
   const [isFlipped, setIsFlipped] = useState(false)
@@ -16,6 +19,8 @@ export default function UNKProfileCard() {
   const backCardRef = useRef<HTMLDivElement>(null)
   const animationFrameRef = useRef<number>()
   const lastUpdateTimeRef = useRef<number>(0)
+
+  const router = useRouter()
 
   // Função de interpolação linear
   const lerp = (start: number, end: number, factor: number) => {
@@ -215,6 +220,17 @@ export default function UNKProfileCard() {
 
   return (
     <div className="w-full h-full flex items-center justify-center p-4 font-mono">
+      {/* Back Button */}
+      <Button
+        onClick={() => router.push("/")}
+        variant="ghost"
+        size="sm"
+        className="absolute top-4 left-4 z-50 text-white hover:text-emerald-400 hover:bg-zinc-800/50 backdrop-blur-sm"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Voltar
+      </Button>
+
       <div className="relative w-full max-w-md mx-auto">
         <div
           ref={cardContainerRef}
