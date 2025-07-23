@@ -1,93 +1,56 @@
-import { NextResponse } from "next/server"
-import { neonDB, getSql } from "@/lib/neon"
+import { type NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const usuarioId = searchParams.get("usuario_id")
 
     if (!usuarioId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ID do usuário é obrigatório",
-        },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: "ID do usuário é obrigatório" }, { status: 400 })
     }
 
-    console.log(`📄 Buscando documentos para usuário: ${usuarioId}`)
-
-    const documentos = await neonDB.getDocumentosByUsuario(usuarioId)
-
-    console.log(`✅ ${documentos.length} documentos encontrados`)
-
-    return NextResponse.json({
-      success: true,
-      message: `${documentos.length} documentos encontrados`,
-      data: documentos,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    console.error("💥 Erro ao buscar documentos:", error)
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Erro ao buscar documentos",
-        error: error instanceof Error ? error.message : "Erro desconhecido",
-        timestamp: new Date().toISOString(),
+    const documentos = await prisma.documentos.findMany({
+      where: {
+        usuario_id: Number.parseInt(usuarioId),
       },
-      { status: 500 },
-    )
+      include: {
+        projeto: {
+          select: {
+            nome: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: "desc",
+      },
+    })
+
+    return NextResponse.json(documentos)
+  } catch (error) {
+    console.error("Erro ao buscar documentos:", error)
+    return NextResponse.json({ error: "Erro ao buscar documentos" }, { status: 500 })
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { usuario_id, nome, tipo, url, tamanho } = body
+    const data = await request.json()
 
-    if (!usuario_id || !nome || !tipo) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ID do usuário, nome e tipo são obrigatórios",
-        },
-        { status: 400 },
-      )
-    }
-
-    console.log(`📄 Criando novo documento: ${nome}`)
-
-    const sql = getSql()
-    const result = await sql`
-      INSERT INTO public.documentos (usuario_id, nome, tipo, url, tamanho)
-      VALUES (${usuario_id}, ${nome}, ${tipo}, ${url}, ${tamanho})
-      RETURNING *
-    `
-
-    const newDocument = result[0]
-
-    console.log(`✅ Documento criado com sucesso: ${newDocument.id}`)
-
-    return NextResponse.json({
-      success: true,
-      message: "Documento criado com sucesso",
-      data: newDocument,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    console.error("💥 Erro ao criar documento:", error)
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Erro ao criar documento",
-        error: error instanceof Error ? error.message : "Erro desconhecido",
-        timestamp: new Date().toISOString(),
+    const documento = await prisma.documentos.create({
+      data: {
+        nome: data.nome,
+        tipo: data.tipo,
+        url: data.url || null,
+        conteudo: data.conteudo || null,
+        usuario_id: data.usuario_id,
+        projeto_id: data.projeto_id || null,
       },
-      { status: 500 },
-    )
+    })
+
+    return NextResponse.json(documento, { status: 201 })
+  } catch (error) {
+    console.error("Erro ao criar documento:", error)
+    return NextResponse.json({ error: "Erro ao criar documento" }, { status: 500 })
   }
 }

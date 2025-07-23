@@ -1,192 +1,150 @@
-import { neonDB } from "@/lib/neon"
+import { neonDB } from "./neon"
 
 export interface LoginCredentials {
   email: string
-  senha: string
+  password: string
 }
 
-export interface LoginResult {
-  success: boolean
-  message?: string
-  user?: any
-}
-
-export interface User {
-  id: string
+export interface AuthUser {
+  id: number
   nome: string
   email: string
-  tipo_usuario: string
-  ativo: boolean
+  tipo: string
+  role?: string
+  is_active?: boolean
+  last_login?: string
 }
 
-// Chave para localStorage
-const USER_STORAGE_KEY = "currentUser"
-const LOGIN_TIMESTAMP_KEY = "loginTimestamp"
+export class AuthService {
+  private static readonly SESSION_KEY = "unk_user_session"
 
-// Duração da sessão (24 horas em milissegundos)
-const SESSION_DURATION = 24 * 60 * 60 * 1000
+  static async login(credentials: LoginCredentials): Promise<AuthUser | null> {
+    console.log("🔐 [AUTH] Attempting login for:", credentials.email)
 
-// Função de login
-export async function login(credentials: LoginCredentials): Promise<LoginResult> {
-  try {
-    console.log("🔐 Tentando fazer login com:", credentials.email)
+    try {
+      const user = await neonDB.getUsuarioByEmail(credentials.email)
 
-    // Buscar usuário no banco
-    const usuario = await neonDB.getUsuarioByEmail(credentials.email)
-
-    if (!usuario) {
-      console.log("❌ Usuário não encontrado")
-      return {
-        success: false,
-        message: "Email não encontrado",
+      if (!user) {
+        console.log("❌ [AUTH] User not found")
+        return null
       }
-    }
 
-    if (!usuario.ativo) {
-      console.log("❌ Usuário inativo")
-      return {
-        success: false,
-        message: "Usuário inativo",
+      if (!user.ativo) {
+        console.log("❌ [AUTH] User account is inactive")
+        return null
       }
-    }
 
-    // Verificar senha (em produção, use hash)
-    if (usuario.senha !== credentials.senha) {
-      console.log("❌ Senha incorreta")
-      return {
-        success: false,
-        message: "Senha incorreta",
+      // Simple password check (in production, use proper hashing)
+      if (user.senha !== credentials.password) {
+        console.log("❌ [AUTH] Invalid password")
+        return null
       }
-    }
 
-    // Criar objeto do usuário sem a senha
-    const userSession = {
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      tipo_usuario: usuario.tipo_usuario,
-      ativo: usuario.ativo,
-    }
+      // Update last login
+      try {
+        await neonDB.updateUsuario(user.id, {
+          ...user,
+          updated_at: new Date().toISOString(),
+        })
+      } catch (updateError) {
+        console.warn("⚠️ [AUTH] Could not update last login:", updateError)
+      }
 
-    // Salvar no localStorage
-    setCurrentUser(userSession)
+      const authUser: AuthUser = {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        tipo: user.tipo,
+        role: user.tipo === "admin" ? "admin" : "user",
+        is_active: user.ativo,
+        last_login: new Date().toISOString(),
+      }
 
-    console.log("✅ Login realizado com sucesso para:", usuario.nome)
+      // Store session
+      this.setSession(authUser)
 
-    return {
-      success: true,
-      message: "Login realizado com sucesso",
-      user: userSession,
-    }
-  } catch (error) {
-    console.error("💥 Erro no login:", error)
-    return {
-      success: false,
-      message: "Erro interno do servidor",
+      console.log("✅ [AUTH] Login successful for:", user.nome)
+      return authUser
+    } catch (error) {
+      console.error("❌ [AUTH] Login error:", error)
+      return null
     }
   }
-}
 
-// Função para salvar usuário atual
-export function setCurrentUser(user: User): void {
-  try {
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
-    localStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
-    console.log("💾 Usuário salvo no localStorage:", user.nome)
-  } catch (error) {
-    console.error("Erro ao salvar usuário:", error)
+  static logout(): void {
+    console.log("🚪 [AUTH] Logging out user")
+
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(this.SESSION_KEY)
+      sessionStorage.removeItem(this.SESSION_KEY)
+    }
   }
-}
 
-// Função para obter usuário atual
-export function getCurrentUser(): User | null {
-  try {
-    const userStr = localStorage.getItem(USER_STORAGE_KEY)
-    const timestampStr = localStorage.getItem(LOGIN_TIMESTAMP_KEY)
-
-    if (!userStr || !timestampStr) {
+  static getCurrentUser(): AuthUser | null {
+    if (typeof window === "undefined") {
       return null
     }
 
-    // Verificar se a sessão expirou
-    const loginTime = Number.parseInt(timestampStr)
-    const now = Date.now()
+    try {
+      const sessionData = localStorage.getItem(this.SESSION_KEY) || sessionStorage.getItem(this.SESSION_KEY)
 
-    if (now - loginTime > SESSION_DURATION) {
-      console.log("⏰ Sessão expirada")
-      clearCurrentUser()
+      if (!sessionData) {
+        return null
+      }
+
+      const user = JSON.parse(sessionData) as AuthUser
+      console.log("👤 [AUTH] Current user:", user.nome)
+      return user
+    } catch (error) {
+      console.error("❌ [AUTH] Error getting current user:", error)
+      this.logout() // Clear corrupted session
       return null
     }
+  }
 
-    return JSON.parse(userStr) as User
-  } catch (error) {
-    console.error("Erro ao obter usuário:", error)
-    return null
+  static setSession(user: AuthUser): void {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const sessionData = JSON.stringify(user)
+    localStorage.setItem(this.SESSION_KEY, sessionData)
+    console.log("💾 [AUTH] Session stored for:", user.nome)
+  }
+
+  static isAuthenticated(): boolean {
+    return this.getCurrentUser() !== null
+  }
+
+  static isAdmin(): boolean {
+    const user = this.getCurrentUser()
+    return user?.tipo === "admin" || user?.role === "admin" || false
+  }
+
+  static requireAuth(): AuthUser {
+    const user = this.getCurrentUser()
+    if (!user) {
+      throw new Error("Authentication required")
+    }
+    return user
+  }
+
+  static requireAdmin(): AuthUser {
+    const user = this.requireAuth()
+    if (!this.isAdmin()) {
+      throw new Error("Admin access required")
+    }
+    return user
   }
 }
 
-// Função para limpar usuário atual
-export function clearCurrentUser(): void {
-  try {
-    localStorage.removeItem(USER_STORAGE_KEY)
-    localStorage.removeItem(LOGIN_TIMESTAMP_KEY)
-    console.log("🗑️ Usuário removido do localStorage")
-  } catch (error) {
-    console.error("Erro ao limpar usuário:", error)
-  }
-}
+// Export default instance
+export const authService = AuthService
 
-// Função para fazer logout
-export function logout(): void {
-  clearCurrentUser()
-  console.log("👋 Logout realizado")
-}
+// --- named re-exports expected by the build ---
+export const getCurrentUser = AuthService.getCurrentUser
+export const setCurrentUser = AuthService.setSession // alias
+export const isAdmin = AuthService.isAdmin
+export const logout = AuthService.logout
 
-// Função para verificar se está autenticado
-export function isAuthenticated(): boolean {
-  const user = getCurrentUser()
-  return user !== null
-}
-
-// Função para verificar se é admin
-export function isAdmin(): boolean {
-  const user = getCurrentUser()
-  return user?.tipo_usuario === "admin"
-}
-
-// Função para verificar se é DJ
-export function isDJ(): boolean {
-  const user = getCurrentUser()
-  return user?.tipo_usuario === "dj"
-}
-
-// Função para verificar se é produtor
-export function isProducer(): boolean {
-  const user = getCurrentUser()
-  return user?.tipo_usuario === "produtor" || user?.tipo_usuario === "produtora"
-}
-
-// Função para verificar se é manager
-export function isManager(): boolean {
-  const user = getCurrentUser()
-  return user?.tipo_usuario === "manager"
-}
-
-// Função para manter sessão ativa
-export function maintainSession(): void {
-  const user = getCurrentUser()
-  if (user) {
-    // Atualizar timestamp da sessão
-    localStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
-  }
-}
-
-// Função para restaurar sessão
-export function restoreSession(): User | null {
-  const user = getCurrentUser()
-  if (user) {
-    console.log("🔄 Sessão restaurada para:", user.nome)
-    maintainSession()
-  }
-  return user
-}
+export default AuthService

@@ -1,109 +1,55 @@
-import { NextResponse } from "next/server"
-import { neonDB, getSql } from "@/lib/neon"
+import { type NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const usuarioId = searchParams.get("usuario_id")
 
     if (!usuarioId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ID do usuário é obrigatório",
-        },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: "ID do usuário é obrigatório" }, { status: 400 })
     }
 
-    console.log(`📋 Buscando tarefas para usuário: ${usuarioId}`)
-
-    const tarefas = await neonDB.getTarefasByUsuario(usuarioId)
-
-    console.log(`✅ ${tarefas.length} tarefas encontradas`)
-
-    return NextResponse.json({
-      success: true,
-      message: `${tarefas.length} tarefas encontradas`,
-      data: tarefas,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    console.error("💥 Erro ao buscar tarefas:", error)
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Erro ao buscar tarefas",
-        error: error instanceof Error ? error.message : "Erro desconhecido",
-        timestamp: new Date().toISOString(),
+    const tarefas = await prisma.tarefas.findMany({
+      where: {
+        usuario_id: Number.parseInt(usuarioId),
       },
-      { status: 500 },
-    )
+      include: {
+        projeto: {
+          select: {
+            nome: true,
+          },
+        },
+      },
+      orderBy: [{ data_vencimento: "asc" }, { prioridade: "desc" }],
+    })
+
+    return NextResponse.json(tarefas)
+  } catch (error) {
+    console.error("Erro ao buscar tarefas:", error)
+    return NextResponse.json({ error: "Erro ao buscar tarefas" }, { status: 500 })
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const {
-      usuario_id,
-      titulo,
-      descricao,
-      status = "pendente",
-      prioridade = "media",
-      data_vencimento,
-      categoria,
-      tags = [],
-      progresso = 0,
-    } = body
+    const data = await request.json()
 
-    if (!usuario_id || !titulo) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ID do usuário e título são obrigatórios",
-        },
-        { status: 400 },
-      )
-    }
-
-    console.log(`📋 Criando nova tarefa: ${titulo}`)
-
-    const sql = getSql()
-    const result = await sql`
-      INSERT INTO public.tarefas (
-        usuario_id, titulo, descricao, status, prioridade, 
-        data_vencimento, categoria, tags, progresso
-      )
-      VALUES (
-        ${usuario_id}, ${titulo}, ${descricao}, ${status}, ${prioridade},
-        ${data_vencimento}, ${categoria}, ${tags}, ${progresso}
-      )
-      RETURNING *
-    `
-
-    const newTask = result[0]
-
-    console.log(`✅ Tarefa criada com sucesso: ${newTask.id}`)
-
-    return NextResponse.json({
-      success: true,
-      message: "Tarefa criada com sucesso",
-      data: newTask,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    console.error("💥 Erro ao criar tarefa:", error)
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Erro ao criar tarefa",
-        error: error instanceof Error ? error.message : "Erro desconhecido",
-        timestamp: new Date().toISOString(),
+    const tarefa = await prisma.tarefas.create({
+      data: {
+        titulo: data.titulo,
+        descricao: data.descricao,
+        prioridade: data.prioridade || "media",
+        status: data.status || "pendente",
+        data_vencimento: data.data_vencimento ? new Date(data.data_vencimento) : null,
+        usuario_id: data.usuario_id,
+        projeto_id: data.projeto_id || null,
       },
-      { status: 500 },
-    )
+    })
+
+    return NextResponse.json(tarefa, { status: 201 })
+  } catch (error) {
+    console.error("Erro ao criar tarefa:", error)
+    return NextResponse.json({ error: "Erro ao criar tarefa" }, { status: 500 })
   }
 }

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { neonDB } from "@/lib/neon"
+import { prisma } from "@/lib/prisma"
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,121 +7,44 @@ export async function GET(request: NextRequest) {
     const usuarioId = searchParams.get("usuario_id")
 
     if (!usuarioId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "usuario_id é obrigatório",
-        },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: "ID do usuário é obrigatório" }, { status: 400 })
     }
 
-    const metas = await neonDB.getMetasFinanceirasByUsuario(usuarioId)
-
-    // Calcular estatísticas das metas
-    const estatisticas = metas.reduce(
-      (acc, meta) => {
-        const progresso = (Number(meta.valor_atual) / Number(meta.valor_meta)) * 100
-        acc.totalMetas++
-        acc.valorTotalMetas += Number(meta.valor_meta)
-        acc.valorTotalAtual += Number(meta.valor_atual)
-
-        if (meta.status === "ativa") acc.metasAtivas++
-        if (meta.status === "concluida") acc.metasConcluidas++
-        if (progresso >= 100) acc.metasAlcancadas++
-
-        return acc
+    const metas = await prisma.metas_financeiras.findMany({
+      where: {
+        usuario_id: Number.parseInt(usuarioId),
       },
-      {
-        totalMetas: 0,
-        metasAtivas: 0,
-        metasConcluidas: 0,
-        metasAlcancadas: 0,
-        valorTotalMetas: 0,
-        valorTotalAtual: 0,
+      orderBy: {
+        data_fim: "asc",
       },
-    )
-
-    const progressoGeral =
-      estatisticas.valorTotalMetas > 0 ? (estatisticas.valorTotalAtual / estatisticas.valorTotalMetas) * 100 : 0
-
-    return NextResponse.json({
-      success: true,
-      data: metas.map((meta) => ({
-        ...meta,
-        progresso_percentual: ((Number(meta.valor_atual) / Number(meta.valor_meta)) * 100).toFixed(2),
-      })),
-      estatisticas: {
-        ...estatisticas,
-        progressoGeral: progressoGeral.toFixed(2),
-      },
-      timestamp: new Date().toISOString(),
     })
+
+    return NextResponse.json(metas)
   } catch (error) {
     console.error("Erro ao buscar metas financeiras:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Erro ao buscar metas financeiras",
-        error: error instanceof Error ? error.message : "Erro desconhecido",
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: "Erro ao buscar metas financeiras" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const metaData = await request.json()
+    const data = await request.json()
 
-    if (
-      !metaData.usuario_id ||
-      !metaData.titulo ||
-      !metaData.valor_meta ||
-      !metaData.data_inicio ||
-      !metaData.data_fim
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "usuario_id, titulo, valor_meta, data_inicio e data_fim são obrigatórios",
-        },
-        { status: 400 },
-      )
-    }
-
-    if (new Date(metaData.data_fim) <= new Date(metaData.data_inicio)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "data_fim deve ser posterior à data_inicio",
-        },
-        { status: 400 },
-      )
-    }
-
-    const novaMeta = await neonDB.createMetaFinanceira(metaData)
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Meta financeira criada com sucesso",
-        data: novaMeta,
-        timestamp: new Date().toISOString(),
+    const meta = await prisma.metas_financeiras.create({
+      data: {
+        nome: data.nome,
+        valor_meta: Number.parseFloat(data.valor_meta),
+        valor_atual: data.valor_atual ? Number.parseFloat(data.valor_atual) : 0,
+        data_inicio: new Date(data.data_inicio),
+        data_fim: new Date(data.data_fim),
+        status: data.status || "ativa",
+        usuario_id: data.usuario_id,
       },
-      { status: 201 },
-    )
+    })
+
+    return NextResponse.json(meta, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar meta financeira:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Erro ao criar meta financeira",
-        error: error instanceof Error ? error.message : "Erro desconhecido",
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: "Erro ao criar meta financeira" }, { status: 500 })
   }
 }

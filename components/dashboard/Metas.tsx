@@ -1,101 +1,119 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Plus, Edit3, Trash2 } from "lucide-react"
-import { useLocalStorage } from "@/hooks/useLocalStorage"
-import type { Goal } from "@/lib/types"
+import { Target, TrendingUp } from "lucide-react"
+import { getCurrentUser } from "@/lib/auth"
+
+interface Meta {
+  id: number
+  nome: string
+  valor_meta: number
+  valor_atual: number
+  data_inicio: string
+  data_fim: string
+  status: string
+}
 
 export default function Metas() {
-  const [goals, setGoals] = useLocalStorage<Goal[]>("goals", [
-    {
-      id: "1",
-      title: "Exercícios semanais",
-      description: "Completar 5 treinos por semana",
-      progress: 3,
-      target: 5,
-      unit: "treinos",
-    },
-  ])
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [metas, setMetas] = useState<Meta[]>([])
+  const [loading, setLoading] = useState(true)
+  const user = getCurrentUser()
 
-  const updateProgress = (id: string, newProgress: number) => {
-    setGoals(
-      goals.map((goal) =>
-        goal.id === id ? { ...goal, progress: Math.max(0, Math.min(goal.target, newProgress)) } : goal,
-      ),
+  useEffect(() => {
+    if (user) {
+      fetchMetas()
+    }
+  }, [user])
+
+  const fetchMetas = async () => {
+    try {
+      const response = await fetch(`/api/metas-financeiras?usuario_id=${user?.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setMetas(data.filter((meta: Meta) => meta.status === "ativa").slice(0, 3))
+      }
+    } catch (error) {
+      console.error("Erro ao buscar metas:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const calcularProgresso = (valorAtual: number, valorMeta: number) => {
+    return Math.min((valorAtual / valorMeta) * 100, 100)
+  }
+
+  const formatarMoeda = (valor: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(valor)
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Metas
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
-  const deleteGoal = (id: string) => {
-    setGoals(goals.filter((goal) => goal.id !== id))
-  }
-
   return (
-    <Card className="bg-slate-800 border-slate-700">
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-white font-semibold">Metas</CardTitle>
-        <Button variant="ghost" size="icon" className="text-purple-400 hover:text-purple-300 hover:bg-purple-900/20">
-          <Plus className="h-4 w-4" />
-        </Button>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Target className="h-5 w-5" />
+          Metas Financeiras
+        </CardTitle>
+        <CardDescription>Acompanhe seu progresso</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {goals.map((goal) => {
-          const percentage = (goal.progress / goal.target) * 100
+      <CardContent>
+        {metas.length === 0 ? (
+          <div className="text-center py-8">
+            <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500">Nenhuma meta ativa</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {metas.map((meta) => {
+              const progresso = calcularProgresso(meta.valor_atual, meta.valor_meta)
+              return (
+                <div key={meta.id} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-sm">{meta.nome}</h3>
+                    <span className="text-xs text-gray-500">{progresso.toFixed(0)}%</span>
+                  </div>
 
-          return (
-            <div key={goal.id} className="group space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h4 className="text-white text-sm font-medium">{goal.title}</h4>
-                  <p className="text-gray-400 text-xs">{goal.description}</p>
-                </div>
-                <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-purple-400">
-                    <Edit3 className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteGoal(goal.id)}
-                    className="h-6 w-6 text-gray-400 hover:text-red-400"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
+                  <Progress value={progresso} className="h-2" />
 
-              <div className="space-y-1">
-                <Progress value={percentage} className="h-2" />
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">
-                    {goal.progress}/{goal.target} {goal.unit}
-                  </span>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => updateProgress(goal.id, goal.progress - 1)}
-                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                    >
-                      -
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => updateProgress(goal.id, goal.progress + 1)}
-                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                    >
-                      +
-                    </Button>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>{formatarMoeda(meta.valor_atual)}</span>
+                    <span>{formatarMoeda(meta.valor_meta)}</span>
                   </div>
                 </div>
+              )
+            })}
+
+            <div className="pt-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <TrendingUp className="h-4 w-4" />
+                <span>Continue assim! 🎯</span>
               </div>
             </div>
-          )
-        })}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

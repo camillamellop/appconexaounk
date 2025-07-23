@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { neonDB } from "@/lib/neon"
+import { prisma } from "@/lib/prisma"
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,108 +7,43 @@ export async function GET(request: NextRequest) {
     const usuarioId = searchParams.get("usuario_id")
 
     if (!usuarioId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "usuario_id é obrigatório",
-        },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: "ID do usuário é obrigatório" }, { status: 400 })
     }
 
-    const transacoes = await neonDB.getTransacoesByUsuario(usuarioId)
-
-    // Calcular resumo financeiro
-    const resumo = transacoes.reduce(
-      (acc, transacao) => {
-        if (transacao.tipo === "receita") {
-          acc.totalReceitas += Number(transacao.valor)
-        } else {
-          acc.totalDespesas += Number(transacao.valor)
-        }
-        return acc
+    const transacoes = await prisma.transacoes.findMany({
+      where: {
+        usuario_id: Number.parseInt(usuarioId),
       },
-      { totalReceitas: 0, totalDespesas: 0 },
-    )
-
-    const saldo = resumo.totalReceitas - resumo.totalDespesas
-
-    return NextResponse.json({
-      success: true,
-      data: transacoes,
-      resumo: {
-        ...resumo,
-        saldo,
-        totalTransacoes: transacoes.length,
+      orderBy: {
+        data: "desc",
       },
-      timestamp: new Date().toISOString(),
     })
+
+    return NextResponse.json(transacoes)
   } catch (error) {
     console.error("Erro ao buscar transações:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Erro ao buscar transações",
-        error: error instanceof Error ? error.message : "Erro desconhecido",
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: "Erro ao buscar transações" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const transacaoData = await request.json()
+    const data = await request.json()
 
-    if (
-      !transacaoData.usuario_id ||
-      !transacaoData.tipo ||
-      !transacaoData.categoria ||
-      !transacaoData.descricao ||
-      !transacaoData.valor ||
-      !transacaoData.data_transacao
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "usuario_id, tipo, categoria, descricao, valor e data_transacao são obrigatórios",
-        },
-        { status: 400 },
-      )
-    }
-
-    if (!["receita", "despesa"].includes(transacaoData.tipo)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "tipo deve ser 'receita' ou 'despesa'",
-        },
-        { status: 400 },
-      )
-    }
-
-    const novaTransacao = await neonDB.createTransacao(transacaoData)
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Transação criada com sucesso",
-        data: novaTransacao,
-        timestamp: new Date().toISOString(),
+    const transacao = await prisma.transacoes.create({
+      data: {
+        descricao: data.descricao,
+        valor: Number.parseFloat(data.valor),
+        tipo: data.tipo,
+        categoria: data.categoria,
+        data: data.data ? new Date(data.data) : new Date(),
+        usuario_id: data.usuario_id,
       },
-      { status: 201 },
-    )
+    })
+
+    return NextResponse.json(transacao, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar transação:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Erro ao criar transação",
-        error: error instanceof Error ? error.message : "Erro desconhecido",
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: "Erro ao criar transação" }, { status: 500 })
   }
 }

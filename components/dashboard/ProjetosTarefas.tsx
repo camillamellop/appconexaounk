@@ -1,154 +1,276 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, CheckCircle2, Clock, Circle, AlertCircle } from "lucide-react"
-import { useTarefas } from "@/hooks/useNeon"
+import { Button } from "@/components/ui/button"
+import { FolderOpen, CheckSquare, Plus, Calendar, Clock } from "lucide-react"
+import { getCurrentUser } from "@/lib/auth"
+import { format, parseISO } from "date-fns"
+import { ptBR } from "date-fns/locale"
 
-/* -----------------------------------------------------------
- *  Visual helpers
- * -------------------------------------------------------- */
-const statusIcon: Record<string, any> = {
-  pendente: Circle,
-  em_andamento: Clock,
-  concluida: CheckCircle2,
-  cancelada: AlertCircle,
+interface Projeto {
+  id: number
+  nome: string
+  descricao?: string
+  status: string
+  data_inicio?: string
+  data_fim?: string
+  _count: {
+    tarefas: number
+  }
 }
 
-const priorityColor: Record<string, string> = {
-  baixa: "bg-green-500/20 text-green-400",
-  media: "bg-yellow-500/20 text-yellow-400",
-  alta: "bg-orange-500/20 text-orange-400",
-  urgente: "bg-red-500/20 text-red-400",
+interface Tarefa {
+  id: number
+  titulo: string
+  descricao?: string
+  prioridade: string
+  status: string
+  data_vencimento?: string
+  projeto?: {
+    nome: string
+  }
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const Icon = statusIcon[status] ?? Circle
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-      <Icon className="w-3 h-3" />
-      {status.replace("_", " ")}
-    </span>
-  )
-}
-
-/* -----------------------------------------------------------
- *  Component
- * -------------------------------------------------------- */
 export default function ProjetosTarefas() {
-  const { tarefas, loading, error } = useTarefas()
-  const [showFinished, setShowFinished] = useState(false)
+  const [projetos, setProjetos] = useState<Projeto[]>([])
+  const [tarefas, setTarefas] = useState<Tarefa[]>([])
+  const [loading, setLoading] = useState(true)
+  const user = getCurrentUser()
 
-  const visibleTasks = useMemo(
-    () => tarefas.filter((t) => (showFinished ? true : t.status !== "concluida")),
-    [tarefas, showFinished],
-  )
+  useEffect(() => {
+    if (user) {
+      fetchProjetos()
+      fetchTarefasRecentes()
+    }
+  }, [user])
 
-  const done = tarefas.filter((t) => t.status === "concluida").length
-  const progress = tarefas.length === 0 ? 0 : Math.round((done / tarefas.length) * 100)
+  const fetchProjetos = async () => {
+    try {
+      const response = await fetch(`/api/projetos?usuario_id=${user?.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setProjetos(data.slice(0, 6)) // Mostrar apenas os 6 mais recentes
+      }
+    } catch (error) {
+      console.error("Erro ao buscar projetos:", error)
+    }
+  }
 
-  /* -------------------------- UI states ------------------- */
+  const fetchTarefasRecentes = async () => {
+    try {
+      const response = await fetch(`/api/tarefas?usuario_id=${user?.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setTarefas(data.slice(0, 8)) // Mostrar apenas as 8 mais recentes
+      }
+    } catch (error) {
+      console.error("Erro ao buscar tarefas:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "ativo":
+        return "bg-green-100 text-green-800"
+      case "planejamento":
+        return "bg-blue-100 text-blue-800"
+      case "pausado":
+        return "bg-yellow-100 text-yellow-800"
+      case "concluido":
+        return "bg-gray-100 text-gray-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getPrioridadeColor = (prioridade: string) => {
+    switch (prioridade) {
+      case "alta":
+        return "bg-red-100 text-red-800"
+      case "media":
+        return "bg-yellow-100 text-yellow-800"
+      case "baixa":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getTaskStatusColor = (status: string) => {
+    switch (status) {
+      case "concluida":
+        return "bg-green-100 text-green-800"
+      case "em_andamento":
+        return "bg-blue-100 text-blue-800"
+      case "pendente":
+        return "bg-yellow-100 text-yellow-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
   if (loading) {
     return (
-      <Card className="bg-slate-800 border-slate-700 h-full">
-        <CardHeader>
-          <CardTitle className="text-white">Projetos &amp; Tarefas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-400 text-sm">Carregando tarefas…</p>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Projetos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Tarefas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
-  if (error) {
-    return (
-      <Card className="bg-slate-800 border-slate-700 h-full">
-        <CardHeader>
-          <CardTitle className="text-white">Projetos &amp; Tarefas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-red-400 text-sm">{error}</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  /* --------------------------- Render --------------------- */
   return (
-    <Card className="bg-slate-800 border-slate-700 h-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-white">Projetos &amp; Tarefas</CardTitle>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowFinished((v) => !v)}>
-              {showFinished ? "Ocultar concluídas" : "Mostrar concluídas"}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Projetos */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FolderOpen className="h-5 w-5" />
+                Projetos
+              </CardTitle>
+              <CardDescription>Seus projetos ativos e em andamento</CardDescription>
+            </div>
+            <Button size="sm" variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo
             </Button>
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-1" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          {projetos.length === 0 ? (
+            <div className="text-center py-8">
+              <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 mb-4">Nenhum projeto encontrado</p>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Criar primeiro projeto
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {projetos.map((projeto) => (
+                <div key={projeto.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-sm">{projeto.nome}</h3>
+                    <Badge className={getStatusColor(projeto.status)}>{projeto.status}</Badge>
+                  </div>
+
+                  {projeto.descricao && <p className="text-xs text-gray-600 mb-3">{projeto.descricao}</p>}
+
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <CheckSquare className="h-3 w-3" />
+                      {projeto._count.tarefas} tarefas
+                    </span>
+
+                    {projeto.data_fim && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {format(parseISO(projeto.data_fim), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {projetos.length >= 6 && (
+                <Button variant="ghost" className="w-full text-sm">
+                  Ver todos os projetos
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tarefas */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <CheckSquare className="h-5 w-5" />
+                Tarefas
+              </CardTitle>
+              <CardDescription>Suas tarefas recentes e pendentes</CardDescription>
+            </div>
+            <Button size="sm" variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
               Nova
             </Button>
           </div>
-        </div>
-        {tarefas.length > 0 && (
-          <div className="mt-3">
-            <div className="flex justify-between text-xs text-gray-400">
-              <span>Progresso geral</span>
-              <span className="text-purple-400 font-medium">{progress}%</span>
+        </CardHeader>
+        <CardContent>
+          {tarefas.length === 0 ? (
+            <div className="text-center py-8">
+              <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 mb-4">Nenhuma tarefa encontrada</p>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Criar primeira tarefa
+              </Button>
             </div>
-            <Progress value={progress} className="h-2" />
-          </div>
-        )}
-      </CardHeader>
-
-      <CardContent className="space-y-3 max-h-64 overflow-y-auto">
-        {visibleTasks.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm">Nenhuma tarefa encontrada.</p>
-        ) : (
-          visibleTasks.map((t) => {
-            const Icon = statusIcon[t.status] ?? Circle
-            return (
-              <div key={t.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-slate-700">
-                {/* Status circle */}
-                <div className="mt-1">
-                  <Icon className="w-4 h-4 text-gray-400" />
-                </div>
-
-                {/* Task info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h4
-                      className={`text-sm ${t.status === "concluida" ? "line-through text-gray-500" : "text-gray-300"}`}
-                    >
-                      {t.titulo}
-                    </h4>
-
-                    {/* Priority */}
-                    <Badge className={`border-0 ${priorityColor[t.prioridade]}`}>{t.prioridade}</Badge>
-                  </div>
-
-                  {t.descricao && <p className="text-xs text-gray-400 truncate">{t.descricao}</p>}
-
-                  {/* Progress bar for in-progress items */}
-                  {t.status !== "concluida" && t.progresso > 0 && (
-                    <div className="mt-2">
-                      <Progress value={t.progresso} className="h-1" />
+          ) : (
+            <div className="space-y-3">
+              {tarefas.map((tarefa) => (
+                <div key={tarefa.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-medium text-sm">{tarefa.titulo}</h4>
+                    <div className="flex gap-1">
+                      <Badge className={getPrioridadeColor(tarefa.prioridade)} variant="secondary">
+                        {tarefa.prioridade}
+                      </Badge>
+                      <Badge className={getTaskStatusColor(tarefa.status)} variant="secondary">
+                        {tarefa.status}
+                      </Badge>
                     </div>
-                  )}
+                  </div>
 
-                  <div className="mt-1 flex justify-between text-xs text-gray-500">
-                    <StatusBadge status={t.status} />
-                    {t.data_vencimento && <time>{new Date(t.data_vencimento).toLocaleDateString("pt-BR")}</time>}
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    {tarefa.projeto && <span className="text-purple-600 font-medium">{tarefa.projeto.nome}</span>}
+
+                    {tarefa.data_vencimento && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {format(parseISO(tarefa.data_vencimento), "dd/MM", { locale: ptBR })}
+                      </span>
+                    )}
                   </div>
                 </div>
-              </div>
-            )
-          })
-        )}
-      </CardContent>
-    </Card>
+              ))}
+
+              {tarefas.length >= 8 && (
+                <Button variant="ghost" className="w-full text-sm">
+                  Ver todas as tarefas
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

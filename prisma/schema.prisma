@@ -1,0 +1,179 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("NEON_DATABASE_URL")
+}
+
+model usuarios {
+  id         Int      @id @default(autoincrement())
+  nome       String
+  email      String   @unique
+  senha      String
+  tipo       String   @default("dj") // admin, dj, produtor
+  ativo      Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relacionamentos
+  brandings          brandings[]
+  projetos           projetos[]
+  tarefas            tarefas[]
+  agenda             agenda[]
+  transacoes         transacoes[]
+  gastos_fixos       gastos_fixos[]
+  metas_financeiras  metas_financeiras[]
+  documentos         documentos[]
+
+  @@map("usuarios")
+}
+
+model brandings {
+  id                Int      @id @default(autoincrement())
+  usuario_id        Int
+  cor_primaria      String?
+  cor_secundaria    String?
+  logo_url          String?
+  descricao_estilo  String?
+  referencia_social String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  // Relacionamentos
+  usuario usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@map("brandings")
+}
+
+model projetos {
+  id          Int       @id @default(autoincrement())
+  nome        String
+  descricao   String?
+  status      String    @default("ativo") // ativo, pausado, concluido, cancelado
+  data_inicio DateTime?
+  data_fim    DateTime?
+  usuario_id  Int
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  // Relacionamentos
+  usuario    usuarios     @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  tarefas    tarefas[]
+  documentos documentos[]
+
+  @@map("projetos")
+}
+
+model tarefas {
+  id              Int       @id @default(autoincrement())
+  titulo          String
+  descricao       String?
+  prioridade      String    @default("media") // baixa, media, alta
+  status          String    @default("pendente") // pendente, em_andamento, concluida, cancelada
+  data_vencimento DateTime?
+  usuario_id      Int
+  projeto_id      Int?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  // Relacionamentos
+  usuario usuarios  @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  projeto projetos? @relation(fields: [projeto_id], references: [id], onDelete: SetNull)
+
+  @@map("tarefas")
+}
+
+model agenda {
+  id           Int      @id @default(autoincrement())
+  titulo       String
+  descricao    String?
+  data_evento  DateTime
+  hora_inicio  String?
+  hora_fim     String?
+  local        String?
+  tipo         String   @default("evento") // evento, show, reuniao, gravacao, festival
+  status       String   @default("agendado") // agendado, confirmado, cancelado, realizado
+  usuario_id   Int
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  // Relacionamentos
+  usuario usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@map("agenda")
+}
+
+model transacoes {
+  id         Int      @id @default(autoincrement())
+  descricao  String
+  valor      Decimal  @db.Decimal(10, 2)
+  tipo       String // receita, despesa
+  categoria  String?
+  data       DateTime @default(now())
+  usuario_id Int
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relacionamentos
+  usuario usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@map("transacoes")
+}
+
+model gastos_fixos {
+  id             Int     @id @default(autoincrement())
+  descricao      String
+  valor          Decimal @db.Decimal(10, 2)
+  categoria      String?
+  dia_vencimento Int // dia do mês (1-31)
+  ativo          Boolean @default(true)
+  usuario_id     Int
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  // Relacionamentos
+  usuario usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@map("gastos_fixos")
+}
+
+model metas_financeiras {
+  id           Int      @id @default(autoincrement())
+  nome         String
+  valor_meta   Decimal  @db.Decimal(10, 2)
+  valor_atual  Decimal  @default(0) @db.Decimal(10, 2)
+  data_inicio  DateTime
+  data_fim     DateTime
+  status       String   @default("ativa") // ativa, pausada, concluida, cancelada
+  usuario_id   Int
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  // Relacionamentos
+  usuario usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@map("metas_financeiras")
+}
+
+model documentos {
+  id         Int      @id @default(autoincrement())
+  nome       String
+  tipo       String // contrato, letra, tecnico, financeiro, juridico
+  url        String?
+  conteudo   String?
+  usuario_id Int
+  projeto_id Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relacionamentos
+  usuario usuarios  @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  projeto projetos? @relation(fields: [projeto_id], references: [id], onDelete: SetNull)
+
+  @@map("documentos")
+}

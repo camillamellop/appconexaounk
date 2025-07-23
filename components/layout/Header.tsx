@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import { Bell, Settings, User, LogOut, Shield } from "lucide-react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -12,131 +11,111 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { getCurrentUser, logout, isAdmin } from "@/lib/auth"
-import ProfileModal from "@/components/profile/ProfileModal"
-import LogoutConfirmDialog from "@/components/profile/LogoutConfirmDialog"
+import { Bell, Settings, LogOut } from "lucide-react"
+import { useRouter } from "next/navigation"
+
+interface AppUser {
+  id: number
+  nome: string
+  email: string
+  tipo: string
+}
 
 export default function Header() {
-  const [showProfileModal, setShowProfileModal] = useState(false)
-  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
-  const user = getCurrentUser()
-  const userIsAdmin = isAdmin()
+  const [user, setUser] = useState<AppUser | null>(null)
+  const router = useRouter()
 
-  if (!user) return null
+  useEffect(() => {
+    const userData = localStorage.getItem("user")
+    if (userData) {
+      setUser(JSON.parse(userData))
+    }
+  }, [])
 
-  // Safely build the two-letter initials shown in the avatar fallback.
-  const getInitials = (name?: string) => {
-    // If name is falsy or not a string, show a default “U” (for “Usuário”)
-    if (!name || typeof name !== "string") return "U"
-    const initials = name
-      .trim()
-      .split(/\s+/) // handle multiple spaces
+  const handleLogout = () => {
+    localStorage.removeItem("user")
+    localStorage.removeItem("token")
+    router.push("/login")
+  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2)
-
-    return initials || "U"
   }
 
-  const getUserTypeLabel = (tipo: string) => {
-    switch (tipo) {
-      case "admin":
-        return "Admin"
-      case "dj":
-        return "DJ"
-      case "cliente":
-        return "Cliente"
-      default:
-        return "Usuário"
-    }
-  }
-
-  const getUserTypeBadgeVariant = (tipo: string) => {
-    switch (tipo) {
-      case "admin":
-        return "destructive"
-      case "dj":
-        return "default"
-      case "cliente":
-        return "secondary"
-      default:
-        return "outline"
-    }
+  if (!user) {
+    return null
   }
 
   return (
-    <>
-      <header className="sticky top-0 z-50 w-full border-b border-slate-800 bg-slate-950/95 backdrop-blur supports-[backdrop-filter]:bg-slate-950/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          {/* Logo */}
-          <div className="flex items-center space-x-2">
-            <div className="text-2xl font-bold text-white">unk</div>
-            {userIsAdmin && (
-              <Badge variant="destructive" className="text-xs">
-                <Shield className="w-3 h-3 mr-1" />
-                Admin
-              </Badge>
-            )}
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
+        <div className="mr-4 hidden md:flex">
+          <a className="mr-6 flex items-center space-x-2" href="/">
+            <div className="h-6 w-6 bg-gradient-to-r from-purple-500 to-pink-500 rounded"></div>
+            <span className="hidden font-bold sm:inline-block">UNK Dashboard</span>
+          </a>
+        </div>
+
+        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+          <div className="w-full flex-1 md:w-auto md:flex-none">
+            <div className="hidden md:flex items-center space-x-4">
+              <span className="text-sm text-muted-foreground">Bem-vindo, {user.nome}</span>
+              {user.tipo === "admin" && (
+                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                  Admin
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* User Menu */}
-          <div className="flex items-center space-x-4">
-            {/* Notifications */}
-            <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
-              <Bell className="h-5 w-5" />
+          <nav className="flex items-center space-x-2">
+            <Button variant="ghost" size="sm" className="h-8 w-8 px-0">
+              <Bell className="h-4 w-4" />
+              <span className="sr-only">Notificações</span>
             </Button>
 
-            {/* User Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.nome} />
-                    <AvatarFallback className="bg-slate-700 text-white">{getInitials(user.nome)}</AvatarFallback>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="/placeholder.svg" alt={user.nome} />
+                    <AvatarFallback className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                      {getInitials(user.nome)}
+                    </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 bg-slate-900 border-slate-700" align="end" forceMount>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none text-white">{user.nome}</p>
-                    <p className="text-xs leading-none text-slate-400">{user.email}</p>
-                    <Badge variant={getUserTypeBadgeVariant(user.tipo)} className="w-fit text-xs mt-1">
-                      {getUserTypeLabel(user.tipo)}
-                    </Badge>
+                    <p className="text-sm font-medium leading-none">{user.nome}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-slate-700" />
-                <DropdownMenuItem
-                  onClick={() => setShowProfileModal(true)}
-                  className="text-slate-300 hover:text-white hover:bg-slate-800"
-                >
-                  <User className="mr-2 h-4 w-4" />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Bell className="mr-2 h-4 w-4" />
                   <span>Perfil</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-slate-300 hover:text-white hover:bg-slate-800">
+                <DropdownMenuItem>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configurações</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-slate-700" />
-                <DropdownMenuItem
-                  onClick={() => setShowLogoutDialog(true)}
-                  className="text-red-400 hover:text-red-300 hover:bg-slate-800"
-                >
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sair</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+          </nav>
         </div>
-      </header>
-
-      {/* Modals */}
-      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} />
-      <LogoutConfirmDialog isOpen={showLogoutDialog} onClose={() => setShowLogoutDialog(false)} onConfirm={logout} />
-    </>
+      </div>
+    </header>
   )
 }

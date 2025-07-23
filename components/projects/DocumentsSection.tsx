@@ -1,61 +1,44 @@
 "use client"
-
-import type React from "react"
-
-import { useRef } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Upload, FileText, Download, Trash2, FolderOpen } from "lucide-react"
+import { FileUpload } from "@/components/ui/file-upload"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { FolderOpen, Download, Trash2, Plus, FileText } from "lucide-react"
 import { useLocalStorage } from "@/hooks/useLocalStorage"
+import { formatFileSize, getFileIcon, type UploadedFile } from "@/lib/file-upload"
 import type { ProjectDocument } from "@/lib/project-types"
 
 export default function DocumentsSection() {
   const [documents, setDocuments] = useLocalStorage<ProjectDocument[]>("projectDocuments", [])
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showUpload, setShowUpload] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files) return
+  const handleFileUpload = async (uploadedFiles: UploadedFile[]) => {
+    setIsLoading(true)
 
-    Array.from(files).forEach((file) => {
-      const newDocument: ProjectDocument = {
-        id: Date.now().toString() + Math.random(),
+    try {
+      const newDocuments: ProjectDocument[] = uploadedFiles.map((file) => ({
+        id: file.id,
         name: file.name,
-        type: file.type || "application/octet-stream",
+        type: file.type,
         size: file.size,
-        url: URL.createObjectURL(file), // Em produção, seria upload para servidor
-        uploadedAt: new Date(),
-      }
+        url: file.url,
+        uploadedAt: file.uploadedAt,
+      }))
 
-      setDocuments((prev) => [...prev, newDocument])
-    })
-
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+      setDocuments((prev) => [...prev, ...newDocuments])
+      setShowUpload(false)
+    } catch (error) {
+      console.error("Error uploading files:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const deleteDocument = (id: string) => {
     setDocuments((prev) => prev.filter((doc) => doc.id !== id))
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-  }
-
-  const getFileIcon = (type: string) => {
-    if (type.includes("image")) return "🖼️"
-    if (type.includes("pdf")) return "📄"
-    if (type.includes("word") || type.includes("document")) return "📝"
-    if (type.includes("excel") || type.includes("spreadsheet")) return "📊"
-    if (type.includes("powerpoint") || type.includes("presentation")) return "📊"
-    return "📁"
   }
 
   return (
@@ -74,28 +57,35 @@ export default function DocumentsSection() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Upload Area */}
-        <div className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center hover:border-purple-500 transition-colors">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileUpload}
-            className="hidden"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif"
-          />
-          <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-          <p className="text-gray-400 mb-2">Arraste arquivos aqui ou clique para selecionar</p>
+        {showUpload ? (
+          <div className="space-y-4">
+            <FileUpload
+              onUpload={handleFileUpload}
+              multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif"
+              disabled={isLoading}
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowUpload(false)}
+                disabled={isLoading}
+                className="border-slate-600 text-gray-300 hover:bg-slate-700"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
           <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            className="border-slate-600 text-gray-300 hover:bg-slate-700"
+            onClick={() => setShowUpload(true)}
+            className="w-full bg-green-600 hover:bg-green-700 text-white"
+            disabled={isLoading}
           >
-            <Upload className="h-4 w-4 mr-2" />
-            Selecionar Arquivos
+            {isLoading ? <LoadingSpinner size="sm" className="mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+            Anexar Documento
           </Button>
-          <p className="text-xs text-gray-500 mt-2">Suporte: PDF, DOC, XLS, PPT, JPG, PNG (máx. 10MB cada)</p>
-        </div>
+        )}
 
         {/* Lista de Documentos */}
         <div className="space-y-2">
@@ -137,7 +127,7 @@ export default function DocumentsSection() {
           ))}
         </div>
 
-        {documents.length === 0 && (
+        {documents.length === 0 && !showUpload && (
           <div className="text-center py-8 text-gray-400">
             <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>Nenhum documento anexado ainda</p>

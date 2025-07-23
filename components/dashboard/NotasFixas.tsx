@@ -1,106 +1,128 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Edit3, Trash2 } from "lucide-react"
-import { useLocalStorage } from "@/hooks/useLocalStorage"
-import type { Note } from "@/lib/types"
+import { Textarea } from "@/components/ui/textarea"
+import { StickyNote, Plus, X } from "lucide-react"
+
+interface Nota {
+  id: string
+  texto: string
+  cor: string
+  timestamp: number
+}
+
+const cores = [
+  "bg-yellow-100 border-yellow-200",
+  "bg-pink-100 border-pink-200",
+  "bg-blue-100 border-blue-200",
+  "bg-green-100 border-green-200",
+  "bg-purple-100 border-purple-200",
+  "bg-orange-100 border-orange-200",
+]
 
 export default function NotasFixas() {
-  const [notes, setNotes] = useLocalStorage<Note[]>("notes", [])
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editContent, setEditContent] = useState("")
+  const [notas, setNotas] = useState<Nota[]>([])
+  const [novaNota, setNovaNota] = useState("")
+  const [mostrarForm, setMostrarForm] = useState(false)
 
-  const addNote = () => {
-    const newNote: Note = {
-      id: Date.now().toString(),
-      content: "Nova nota...",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+  useEffect(() => {
+    const notasSalvas = localStorage.getItem("notas-fixas")
+    if (notasSalvas) {
+      setNotas(JSON.parse(notasSalvas))
     }
-    setNotes([...notes, newNote])
-    setEditingId(newNote.id)
-    setEditContent(newNote.content)
+  }, [])
+
+  const salvarNotas = (notasAtualizadas: Nota[]) => {
+    setNotas(notasAtualizadas)
+    localStorage.setItem("notas-fixas", JSON.stringify(notasAtualizadas))
   }
 
-  const saveNote = (id: string) => {
-    setNotes(notes.map((note) => (note.id === id ? { ...note, content: editContent, updatedAt: new Date() } : note)))
-    setEditingId(null)
-    setEditContent("")
+  const adicionarNota = () => {
+    if (novaNota.trim()) {
+      const nota: Nota = {
+        id: Date.now().toString(),
+        texto: novaNota.trim(),
+        cor: cores[Math.floor(Math.random() * cores.length)],
+        timestamp: Date.now(),
+      }
+      salvarNotas([...notas, nota])
+      setNovaNota("")
+      setMostrarForm(false)
+    }
   }
 
-  const deleteNote = (id: string) => {
-    setNotes(notes.filter((note) => note.id !== id))
-  }
-
-  const startEdit = (note: Note) => {
-    setEditingId(note.id)
-    setEditContent(note.content)
+  const removerNota = (id: string) => {
+    salvarNotas(notas.filter((nota) => nota.id !== id))
   }
 
   return (
-    <Card className="bg-slate-800 border-slate-700">
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-white font-semibold">Notas Fixas</CardTitle>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={addNote}
-          className="text-purple-400 hover:text-purple-300 hover:bg-purple-900/20"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <StickyNote className="h-5 w-5" />
+              Notas Fixas
+            </CardTitle>
+            <CardDescription>Suas anotações rápidas</CardDescription>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setMostrarForm(!mostrarForm)}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {notes.length === 0 ? (
-          <p className="text-gray-400 text-sm italic">Nenhuma nota ainda. Clique no + para adicionar.</p>
-        ) : (
-          notes.map((note) => (
-            <div key={note.id} className="group relative">
-              {editingId === note.id ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full p-2 bg-slate-700 border border-slate-600 rounded text-white text-sm resize-none"
-                    rows={2}
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => saveNote(note.id)} className="bg-purple-600 hover:bg-purple-700">
-                      Salvar
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="text-gray-400">
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-2 bg-slate-700/50 rounded text-sm text-gray-300 group-hover:bg-slate-700/70">
-                  {note.content}
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => startEdit(note)}
-                      className="h-6 w-6 text-gray-400 hover:text-purple-400"
-                    >
-                      <Edit3 className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteNote(note.id)}
-                      className="h-6 w-6 text-gray-400 hover:text-red-400"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+      <CardContent className="space-y-4">
+        {mostrarForm && (
+          <div className="space-y-2">
+            <Textarea
+              placeholder="Digite sua nota..."
+              value={novaNota}
+              onChange={(e) => setNovaNota(e.target.value)}
+              className="min-h-[80px]"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={adicionarNota}>
+                Salvar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setMostrarForm(false)
+                  setNovaNota("")
+                }}
+              >
+                Cancelar
+              </Button>
             </div>
-          ))
+          </div>
+        )}
+
+        {notas.length === 0 ? (
+          <div className="text-center py-8">
+            <StickyNote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 mb-4">Nenhuma nota ainda</p>
+            <Button size="sm" onClick={() => setMostrarForm(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Criar primeira nota
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {notas.map((nota) => (
+              <div key={nota.id} className={`p-3 rounded-lg border-2 ${nota.cor} relative group`}>
+                <button
+                  onClick={() => removerNota(nota.id)}
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-4 w-4 text-gray-500 hover:text-red-500" />
+                </button>
+                <p className="text-sm text-gray-700 pr-6">{nota.texto}</p>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

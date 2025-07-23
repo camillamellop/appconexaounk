@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Calendar, dateFnsLocalizer } from "react-big-calendar"
+import { CalendarIcon } from "lucide-react"
 import { format, parse, startOfWeek, getDay } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAgendaEvents } from "@/hooks/useNeon"
 import { isAdmin } from "@/lib/auth"
-import { CalendarIcon } from "lucide-react"
+import { Calendar, dateFnsLocalizer } from "react-big-calendar"
 import "react-big-calendar/lib/css/react-big-calendar.css"
 
 const localizer = dateFnsLocalizer({
@@ -41,17 +41,17 @@ interface CalendarViewProps {
   onDateSelect?: (date: Date) => void
 }
 
-export default function CalendarView({ selectedDate, onDateSelect }: CalendarViewProps) {
+function CalendarView({ selectedDate, onDateSelect }: CalendarViewProps) {
   const { events, loading, error } = useAgendaEvents()
   const [selectedDJ, setSelectedDJ] = useState<string>("all")
   const userIsAdmin = isAdmin()
 
   // Cores para cada DJ
   const djColors = {
-    "suzy@conexaounk.com": "#8B5CF6", // Purple
+    "suzyprado1@gmail.com": "#8B5CF6", // Purple
+    "camilla@conexaounk.com": "#F59E0B", // Amber
     "pedro@conexaounk.com": "#06B6D4", // Cyan
     "gustavo@conexaounk.com": "#10B981", // Emerald
-    "camilla@conexaounk.com": "#F59E0B", // Amber
   }
 
   // Filtrar eventos por DJ selecionado
@@ -63,8 +63,7 @@ export default function CalendarView({ selectedDate, onDateSelect }: CalendarVie
   // Converter eventos para formato do calendário
   const calendarEvents = useMemo(() => {
     return filteredEvents.map((event) => {
-      // Compatibilidade: aceita data_evento (legado) ou data_inicio (Neon).
-      const startDate = new Date(event.data_evento ?? event.data_inicio)
+      const startDate = new Date(event.data_inicio)
 
       // Se tem hora de início, usar ela
       if (event.hora_inicio) {
@@ -235,7 +234,6 @@ export default function CalendarView({ selectedDate, onDateSelect }: CalendarVie
               }}
               onSelectEvent={(event) => {
                 console.log("Event selected:", event)
-                // Aqui você pode abrir um modal com detalhes do evento
               }}
               onSelectSlot={(slotInfo) => {
                 if (onDateSelect) {
@@ -283,3 +281,6 @@ export default function CalendarView({ selectedDate, onDateSelect }: CalendarVie
     </div>
   )
 }
+
+export default CalendarView
+export { CalendarView }
