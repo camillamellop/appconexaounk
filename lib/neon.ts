@@ -1,4 +1,6 @@
 import { neon } from "@neondatabase/serverless"
+import { PrismaNeon } from "@prisma/adapter-neon"
+import { PrismaClient } from "@prisma/client"
 
 // Types
 export interface Usuario {
@@ -110,27 +112,16 @@ export interface Projeto {
   updated_at: string
 }
 
-export function getSql() {
-  // Priority order for database URLs
-  const url =
-    process.env.NEON_DATABASE_URL ||
-    process.env.DATABASE_URL ||
-    process.env.NEON_POSTGRES_URL ||
-    process.env.POSTGRES_URL
+// Neon serverless connection
+const connectionString = process.env.NEON_DATABASE_URL!
+export const sql = neon(connectionString)
 
-  if (!url) {
-    throw new Error(
-      "❌ Nenhuma variável de ambiente de banco encontrada. " +
-        "Configure DATABASE_URL, NEON_DATABASE_URL, ou POSTGRES_URL",
-    )
-  }
-
-  console.log("🔗 [NEON] Using database URL:", url.substring(0, 20) + "...")
-  return neon(url)
-}
+// Prisma with Neon adapter
+const adapter = new PrismaNeon({ connectionString })
+export const prisma = new PrismaClient({ adapter })
 
 class NeonDB {
-  private sql = getSql()
+  private sql = sql
 
   async ensureSchema() {
     console.log("🔧 [NEON] Ensuring database schema...")
@@ -268,19 +259,6 @@ class NeonDB {
     }
   }
 
-  async testConnection(): Promise<boolean> {
-    console.log("🧪 [NEON] Testing database connection...")
-
-    try {
-      const result = await this.sql`SELECT 1 as test`
-      console.log("✅ [NEON] Connection test successful:", result)
-      return true
-    } catch (error) {
-      console.error("❌ [NEON] Connection test failed:", error)
-      return false
-    }
-  }
-
   // Usuario methods
   async getUsuarios(): Promise<Usuario[]> {
     console.log("👥 [NEON] Fetching all users...")
@@ -316,13 +294,15 @@ class NeonDB {
 
     try {
       await this.ensureSchema()
-      const users = await this.sql`SELECT * FROM public.usuarios WHERE email = ${email} AND ativo = true`
-      const user = (users[0] as Usuario) || null
-      console.log(`${user ? "✅" : "❌"} [NEON] User ${user ? "found" : "not found"}`)
-      return user
+      const users = await this.sql`
+        SELECT id, nome, email, tipo, ativo 
+        FROM usuarios 
+        WHERE email = ${email} AND ativo = true
+      `
+      return users[0] || null
     } catch (error) {
-      console.error("❌ [NEON] Error finding user by email:", error)
-      throw error
+      console.error("Error fetching user:", error)
+      return null
     }
   }
 
@@ -699,6 +679,21 @@ class NeonDB {
       console.error("❌ [NEON] Error creating project:", error)
       throw error
     }
+  }
+}
+
+// Get all users (admin only)
+export async function getAllUsers() {
+  try {
+    const users = await sql`
+      SELECT id, nome, email, tipo, ativo, created_at 
+      FROM usuarios 
+      ORDER BY created_at DESC
+    `
+    return users
+  } catch (error) {
+    console.error("Error fetching users:", error)
+    return []
   }
 }
 
