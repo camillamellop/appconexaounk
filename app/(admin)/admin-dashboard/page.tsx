@@ -88,7 +88,7 @@ export default function AdminDashboard() {
       console.error("Erro ao buscar estatísticas admin:", error)
     } finally {
       setLoading(false)
-    }
+    )
   }
 
   if (loading) {
