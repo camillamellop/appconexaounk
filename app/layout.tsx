@@ -1,13 +1,13 @@
 import type React from "react"
-import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import "./globals.css"
 import { AuthProvider } from "@/hooks/use-auth"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Conexão UNK",
+  title: "Conexão UNK - Dashboard",
   description: "Plataforma para DJs e produtores da Conexão UNK",
     generator: 'v0.dev'
 }

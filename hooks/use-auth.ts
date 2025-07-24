@@ -1,18 +1,20 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
 
 export type User = {
   id: number
-  name: string
+  nome: string
   email: string
-  type: string
+  tipo: "admin" | "dj" | "produtor"
+  ativo: boolean
 }
 
 type AuthContextType = {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, senha: string) => Promise<{ success: boolean; user?: User; error?: string }>
   logout: () => Promise<void>
 }
 
@@ -21,58 +23,74 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
-    // Verificar se o usuário já está autenticado
-    const checkAuth = async () => {
-      try {
-        const res = await fetch("/api/auth/me")
-        if (res.ok) {
-          const data = await res.json()
-          setUser(data.user)
-        }
-      } catch (error) {
-        console.error("Erro ao verificar autenticação:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     checkAuth()
   }, [])
 
-  const login = async (email: string, password: string) => {
-    setLoading(true)
+  const checkAuth = async () => {
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
+      const response = await fetch("/api/auth/me", {
+        credentials: "include",
       })
 
-      if (!res.ok) {
-        throw new Error("Falha na autenticação")
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setUser(data.user)
+        }
       }
-
-      const data = await res.json()
-      setUser(data.user)
-      return data
+    } catch (error) {
+      console.error("Erro ao verificar autenticação:", error)
     } finally {
       setLoading(false)
     }
   }
 
+  const login = async (email: string, senha: string) => {
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, senha }),
+        credentials: "include",
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setUser(data.user)
+
+        // Redirecionar baseado no tipo de usuário
+        if (data.user.tipo === "admin") {
+          router.push("/admin-dashboard")
+        } else {
+          router.push("/dashboard")
+        }
+
+        return { success: true, user: data.user }
+      } else {
+        return { success: false, error: data.error || "Credenciais inválidas" }
+      }
+    } catch (error) {
+      return { success: false, error: "Erro de conexão" }
+    }
+  }
+
   const logout = async () => {
-    setLoading(true)
     try {
       await fetch("/api/auth/logout", {
         method: "POST",
+        credentials: "include",
       })
-      setUser(null)
+    } catch (error) {
+      console.error("Erro no logout:", error)
     } finally {
-      setLoading(false)
+      setUser(null)
+      router.push("/login")
     }
   }
 
@@ -82,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error("useAuth deve ser usado dentro de um AuthProvider")
+    throw new Error("useAuth deve ser usado dentro de AuthProvider")
   }
   return context
 }

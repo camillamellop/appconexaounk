@@ -1,66 +1,49 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { neon } from "@/lib/neon"
+import { neon } from "@neondatabase/serverless"
 import jwt from "jsonwebtoken"
 
-const JWT_SECRET = process.env.JWT_SECRET || "conexaounk-secret-key"
-const COOKIE_NAME = "auth_token"
+const sql = neon(process.env.DATABASE_URL!)
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 export async function GET(request: NextRequest) {
   try {
-    // Obter token do cookie
-    const token = cookies().get(COOKIE_NAME)?.value
+    const token = request.cookies.get("auth-token")?.value
 
     if (!token) {
-      return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
+      return NextResponse.json({ success: false, error: "Token não encontrado" }, { status: 401 })
     }
 
-    try {
-      // Verificar token
-      const decoded = jwt.verify(token, JWT_SECRET) as { id: number; email: string; type: string }
+    // Verificar token
+    const decoded = jwt.verify(token, JWT_SECRET) as any
 
-      // Verificar se a sessão existe no banco
-      const sql = neon(process.env.DATABASE_URL || "")
-      const sessions = await sql`
-        SELECT * FROM sessoes
-        WHERE usuario_id = ${decoded.id} AND token = ${token} AND expira_em > NOW()
-      `
+    // Verificar se a sessão ainda existe no banco
+    const sessions = await sql`
+      SELECT s.*, u.nome, u.email, u.tipo, u.ativo
+      FROM sessoes s
+      JOIN usuarios u ON s.usuario_id = u.id
+      WHERE s.usuario_id = ${decoded.userId} 
+      AND s.expires_at > NOW()
+      AND u.ativo = true
+    `
 
-      if (sessions.length === 0) {
-        cookies().delete(COOKIE_NAME)
-        return NextResponse.json({ error: "Sessão expirada" }, { status: 401 })
-      }
-
-      // Buscar dados atualizados do usuário
-      const users = await sql`
-        SELECT id, nome, email, tipo
-        FROM usuarios
-        WHERE id = ${decoded.id} AND ativo = true
-      `
-
-      if (users.length === 0) {
-        cookies().delete(COOKIE_NAME)
-        return NextResponse.json({ error: "Usuário não encontrado" }, { status: 401 })
-      }
-
-      const user = users[0]
-
-      // Retornar dados do usuário
-      return NextResponse.json({
-        user: {
-          id: user.id,
-          name: user.nome,
-          email: user.email,
-          type: user.tipo,
-        },
-      })
-    } catch (error) {
-      console.error("Erro ao verificar token:", error)
-      cookies().delete(COOKIE_NAME)
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+    if (sessions.length === 0) {
+      return NextResponse.json({ success: false, error: "Sessão expirada" }, { status: 401 })
     }
+
+    const session = sessions[0]
+
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: session.usuario_id,
+        nome: session.nome,
+        email: session.email,
+        tipo: session.tipo,
+        ativo: session.ativo,
+      },
+    })
   } catch (error) {
     console.error("Erro ao verificar autenticação:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Token inválido" }, { status: 401 })
   }
 }

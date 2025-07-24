@@ -1,22 +1,14 @@
--- Criar tabela de sessões para autenticação persistente
+-- Criar tabela de sessões para autenticação
 CREATE TABLE IF NOT EXISTS sessoes (
-  id SERIAL PRIMARY KEY,
-  usuario_id INTEGER NOT NULL,
-  token TEXT NOT NULL,
-  expira_em TIMESTAMP NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
-  CONSTRAINT fk_usuario
-    FOREIGN KEY (usuario_id)
-    REFERENCES usuarios(id)
-    ON DELETE CASCADE
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER NOT NULL,
+    token TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(usuario_id),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
--- Criar índice para busca rápida por token
-CREATE INDEX IF NOT EXISTS idx_sessoes_token ON sessoes(token);
-
--- Criar índice para busca rápida por usuário
-CREATE INDEX IF NOT EXISTS idx_sessoes_usuario ON sessoes(usuario_id);
-
--- Adicionar comentário na tabela
-COMMENT ON TABLE sessoes IS 'Armazena sessões ativas dos usuários para autenticação persistente';
+-- Criar índice para melhor performance
+CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_id ON sessoes(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_sessoes_expires_at ON sessoes(expires_at);

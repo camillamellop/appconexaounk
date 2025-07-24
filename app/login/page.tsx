@@ -3,24 +3,34 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
-import { VolumeIcon, PlayIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Volume2, ChevronLeft, ChevronRight, Play } from "lucide-react"
+
+const users = [
+  { name: "Admin", email: "camilla@conexaounk.com", password: "camillaunk" },
+  { name: "DJ Pedro", email: "pedro@conexaounk.com", password: "pedrounk" },
+  { name: "DJ Suzy", email: "suzy@conexaounk.com", password: "suzyunk" },
+  { name: "DJ Gustavo", email: "gustavo@conexaounk.com", password: "gustavounk" },
+]
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [senha, setSenha] = useState("")
+  const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const [showForm, setShowForm] = useState(false)
   const [currentTime, setCurrentTime] = useState("1:28")
-  const [progress, setProgress] = useState(30) // 30% progress
-  const router = useRouter()
-  const { login, user } = useAuth()
+  const [totalTime] = useState("3:42")
+  const [progress, setProgress] = useState(25)
 
+  const { login, user } = useAuth()
+  const router = useRouter()
+
+  // Redirecionar se já estiver logado
   useEffect(() => {
     if (user) {
-      if (user.type === "admin") {
+      if (user.tipo === "admin") {
         router.push("/admin-dashboard")
       } else {
         router.push("/dashboard")
@@ -28,201 +38,169 @@ export default function LoginPage() {
     }
   }, [user, router])
 
+  // Simular progresso da música
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress((prev) => (prev >= 100 ? 25 : prev + 1))
+
+      // Atualizar tempo baseado no progresso
+      const totalSeconds = 3 * 60 + 42 // 3:42 em segundos
+      const currentSeconds = Math.floor((progress / 100) * totalSeconds)
+      const minutes = Math.floor(currentSeconds / 60)
+      const seconds = currentSeconds % 60
+      setCurrentTime(`${minutes}:${seconds.toString().padStart(2, "0")}`)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [progress])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
+    if (!email || !senha) return
+
     setLoading(true)
+    setError("")
 
     try {
-      await login(email, password)
+      const result = await login(email, senha)
+      if (!result.success) {
+        setError(result.error || "Email ou senha incorretos")
+      }
     } catch (err) {
-      setError("Email ou senha incorretos")
+      setError("Erro de conexão. Tente novamente.")
     } finally {
       setLoading(false)
     }
   }
 
-  const fillCredentials = (userType: string) => {
-    switch (userType) {
-      case "admin":
-        setEmail("camilla@conexaounk.com")
-        setPassword("camillaunk")
-        break
-      case "pedro":
-        setEmail("pedro@conexaounk.com")
-        setPassword("pedrounk")
-        break
-      case "suzy":
-        setEmail("suzy@conexaounk.com")
-        setPassword("suzyunk")
-        break
-      case "gustavo":
-        setEmail("gustavo@conexaounk.com")
-        setPassword("gustavounk")
-        break
-    }
+  const fillCredentials = (userIndex: number) => {
+    const user = users[userIndex]
+    setEmail(user.email)
+    setSenha(user.password)
+    setShowForm(true)
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black p-4">
-      <div className="w-full max-w-md">
-        {/* iPod Design */}
-        <div className="bg-[#121217] rounded-3xl overflow-hidden shadow-2xl border border-gray-800">
-          {/* Screen */}
-          <div className="p-6 pb-2">
-            <div className="bg-[#1a1a22] rounded-2xl p-6 mb-4">
-              <div className="text-center mb-6">
-                <h1 className="text-white text-2xl font-bold tracking-wider">Conexão U N K</h1>
-                <p className="text-gray-400 text-sm">Fuderosa Systems</p>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        {/* iPod Container */}
+        <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-3xl p-6 shadow-2xl border border-gray-700">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-white text-xl font-light tracking-wider">Conexão U N K</h1>
+            <p className="text-gray-400 text-sm mt-1">Fuderosa Systems</p>
+          </div>
 
-              <div className="flex justify-center mb-8">
-                <div className="bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl p-4 w-20 h-20 flex items-center justify-center">
-                  <VolumeIcon className="w-10 h-10 text-white" />
+          {/* Volume Icon */}
+          <div className="flex justify-center mb-4">
+            <div className="bg-gradient-to-br from-purple-500 to-blue-600 p-4 rounded-2xl">
+              <Volume2 className="w-8 h-8 text-white" />
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mb-8">
+            <div className="flex justify-between text-xs text-gray-400 mb-2">
+              <span>{currentTime}</span>
+              <span>{totalTime}</span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-1">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-purple-500 h-1 rounded-full transition-all duration-1000"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Login Form */}
+          {showForm && (
+            <form onSubmit={handleLogin} className="mb-6 space-y-4">
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                required
+              />
+              <input
+                type="password"
+                placeholder="Senha"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                required
+              />
+              {error && (
+                <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded-lg text-sm">
+                  {error}
                 </div>
-              </div>
-
-              {showForm && (
-                <form onSubmit={handleLogin} className="space-y-4 mb-6">
-                  <div>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Email"
-                      className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Senha"
-                      className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      required
-                    />
-                  </div>
-                  {error && (
-                    <div className="bg-red-900/50 border border-red-800 text-red-200 p-2 rounded-lg text-center">
-                      {error}
-                    </div>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50"
-                  >
-                    {loading ? "Entrando..." : "ENTRAR"}
-                  </button>
-                </form>
               )}
+            </form>
+          )}
 
-              {/* Progress bar */}
-              <div className="mt-auto">
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>1:28</span>
-                  <span>3:42</span>
-                </div>
-                <div className="h-1 bg-gray-800 rounded-full">
-                  <div
-                    className="h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
-                    style={{ width: `${progress}%` }}
-                  ></div>
-                </div>
+          {/* iPod Controls */}
+          <div className="relative">
+            {/* MENU Button */}
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="absolute -top-12 left-1/2 transform -translate-x-1/2 text-gray-300 text-xs font-medium hover:text-white transition-colors"
+            >
+              MENU
+            </button>
+
+            {/* Control Wheel */}
+            <div className="relative w-48 h-48 mx-auto">
+              {/* Outer Ring */}
+              <div className="absolute inset-0 bg-gradient-to-b from-gray-600 to-gray-800 rounded-full shadow-inner">
+                {/* Left Arrow */}
+                <button
+                  onClick={() => fillCredentials(1)} // Pedro
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white transition-colors"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+
+                {/* Right Arrow */}
+                <button
+                  onClick={() => fillCredentials(2)} // Suzy
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white transition-colors"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+
+                {/* Center Play Button */}
+                <button
+                  onClick={showForm ? handleLogin : () => fillCredentials(0)} // Admin ou Submit
+                  disabled={loading}
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg hover:from-purple-600 hover:to-blue-700 transition-all disabled:opacity-50"
+                >
+                  <Play className="w-8 h-8 text-white ml-1" />
+                </button>
               </div>
             </div>
 
-            {/* iPod Controls */}
-            <div className="flex flex-col items-center">
-              <div className="text-gray-400 text-xs mb-2">MENU</div>
-              <div className="relative w-48 h-48 bg-gray-800 rounded-full flex items-center justify-center">
-                {/* Center button */}
-                <button
-                  onClick={() => handleLogin({ preventDefault: () => {} } as React.FormEvent)}
-                  className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center z-10"
-                >
-                  <PlayIcon className="w-8 h-8 text-white" />
-                </button>
-
-                {/* Control buttons */}
-                <button
-                  onClick={() => fillCredentials("pedro")}
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white"
-                >
-                  <ChevronLeftIcon className="w-8 h-8" />
-                </button>
-                <button
-                  onClick={() => fillCredentials("suzy")}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white"
-                >
-                  <ChevronRightIcon className="w-8 h-8" />
-                </button>
-                <button
-                  onClick={() => setShowForm(!showForm)}
-                  className="absolute top-4 left-1/2 transform -translate-x-1/2 text-white"
-                >
-                  <span className="sr-only">Menu</span>
-                </button>
-                <button
-                  onClick={() => fillCredentials("admin")}
-                  className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white"
-                >
-                  <span className="sr-only">Select</span>
-                </button>
-              </div>
-              <div className="text-gray-400 text-xs mt-2">SELECT</div>
-            </div>
-          </div>
-
-          {/* Quick login buttons */}
-          <div className="bg-[#0a0a0f] p-4 grid grid-cols-2 gap-2">
+            {/* SELECT Button */}
             <button
-              onClick={() => {
-                fillCredentials("admin")
-                setTimeout(() => handleLogin({ preventDefault: () => {} } as React.FormEvent), 500)
-              }}
-              className="bg-gray-800 text-white p-2 rounded-lg text-sm hover:bg-gray-700"
+              onClick={() => fillCredentials(0)} // Admin
+              className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-gray-300 text-xs font-medium hover:text-white transition-colors"
             >
-              Admin: Camilla
-            </button>
-            <button
-              onClick={() => {
-                fillCredentials("pedro")
-                setTimeout(() => handleLogin({ preventDefault: () => {} } as React.FormEvent), 500)
-              }}
-              className="bg-gray-800 text-white p-2 rounded-lg text-sm hover:bg-gray-700"
-            >
-              DJ: Pedro
-            </button>
-            <button
-              onClick={() => {
-                fillCredentials("suzy")
-                setTimeout(() => handleLogin({ preventDefault: () => {} } as React.FormEvent), 500)
-              }}
-              className="bg-gray-800 text-white p-2 rounded-lg text-sm hover:bg-gray-700"
-            >
-              DJ: Suzy
-            </button>
-            <button
-              onClick={() => {
-                fillCredentials("gustavo")
-                setTimeout(() => handleLogin({ preventDefault: () => {} } as React.FormEvent), 500)
-              }}
-              className="bg-gray-800 text-white p-2 rounded-lg text-sm hover:bg-gray-700"
-            >
-              DJ: Gustavo
+              SELECT
             </button>
           </div>
-        </div>
 
-        {/* Login instructions */}
-        <div className="mt-6 text-center text-gray-400 text-sm">
-          <p>Clique em MENU para mostrar/esconder o formulário</p>
-          <p>Use as setas para preencher credenciais de Pedro/Suzy</p>
-          <p>Use SELECT para preencher credenciais de Admin</p>
-          <p>Ou clique nos botões abaixo para login rápido</p>
+          {/* Quick Access Buttons */}
+          <div className="mt-12 grid grid-cols-2 gap-2">
+            {users.map((user, index) => (
+              <button
+                key={index}
+                onClick={() => fillCredentials(index)}
+                className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-2 rounded-lg text-xs transition-colors"
+              >
+                {user.name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

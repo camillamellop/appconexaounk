@@ -1,38 +1,35 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { neon } from "@/lib/neon"
+import { neon } from "@neondatabase/serverless"
 import jwt from "jsonwebtoken"
 
-const JWT_SECRET = process.env.JWT_SECRET || "conexaounk-secret-key"
-const COOKIE_NAME = "auth_token"
+const sql = neon(process.env.DATABASE_URL!)
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 export async function POST(request: NextRequest) {
   try {
-    // Obter token do cookie
-    const token = cookies().get(COOKIE_NAME)?.value
+    const token = request.cookies.get("auth-token")?.value
 
     if (token) {
       try {
-        // Verificar token
-        const decoded = jwt.verify(token, JWT_SECRET) as { id: number }
+        const decoded = jwt.verify(token, JWT_SECRET) as any
 
         // Remover sessão do banco
-        const sql = neon(process.env.DATABASE_URL || "")
         await sql`
-          DELETE FROM sessoes
-          WHERE usuario_id = ${decoded.id} AND token = ${token}
+          DELETE FROM sessoes 
+          WHERE usuario_id = ${decoded.userId}
         `
       } catch (error) {
-        console.error("Erro ao verificar token:", error)
+        console.error("Erro ao decodificar token:", error)
       }
-
-      // Remover cookie
-      cookies().delete(COOKIE_NAME)
     }
 
-    return NextResponse.json({ success: true })
+    // Criar resposta e limpar cookie
+    const response = NextResponse.json({ success: true })
+    response.cookies.delete("auth-token")
+
+    return response
   } catch (error) {
     console.error("Erro no logout:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Erro interno do servidor" }, { status: 500 })
   }
 }

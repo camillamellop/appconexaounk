@@ -1,40 +1,42 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { neon } from "@/lib/neon"
+import { neon } from "@neondatabase/serverless"
 import jwt from "jsonwebtoken"
-import { cookies } from "next/headers"
 
-const JWT_SECRET = process.env.JWT_SECRET || "conexaounk-secret-key"
-const COOKIE_NAME = "auth_token"
+const sql = neon(process.env.DATABASE_URL!)
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const { email, senha } = await request.json()
 
-    // Validar dados
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email e senha são obrigatórios" }, { status: 400 })
+    if (!email || !senha) {
+      return NextResponse.json({ success: false, error: "Email e senha são obrigatórios" }, { status: 400 })
     }
 
-    // Consultar usuário no banco
-    const sql = neon(process.env.DATABASE_URL || "")
-    const result = await sql`
-      SELECT id, nome, email, tipo
-      FROM usuarios
-      WHERE email = ${email} AND senha = ${password} AND ativo = true
+    // Buscar usuário no banco
+    const users = await sql`
+      SELECT id, nome, email, tipo, ativo, senha
+      FROM usuarios 
+      WHERE email = ${email} AND ativo = true
     `
 
-    if (result.length === 0) {
-      return NextResponse.json({ error: "Email ou senha incorretos" }, { status: 401 })
+    if (users.length === 0) {
+      return NextResponse.json({ success: false, error: "Usuário não encontrado" }, { status: 401 })
     }
 
-    const user = result[0]
+    const user = users[0]
 
-    // Criar token JWT
+    // Verificar senha (assumindo que está em texto plano por enquanto)
+    if (user.senha !== senha) {
+      return NextResponse.json({ success: false, error: "Senha incorreta" }, { status: 401 })
+    }
+
+    // Criar JWT token
     const token = jwt.sign(
       {
-        id: user.id,
+        userId: user.id,
         email: user.email,
-        type: user.tipo,
+        tipo: user.tipo,
       },
       JWT_SECRET,
       { expiresIn: "7d" },
@@ -42,32 +44,35 @@ export async function POST(request: NextRequest) {
 
     // Salvar sessão no banco
     await sql`
-      INSERT INTO sessoes (usuario_id, token, expira_em)
+      INSERT INTO sessoes (usuario_id, token, expires_at)
       VALUES (${user.id}, ${token}, ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)})
+      ON CONFLICT (usuario_id) 
+      DO UPDATE SET token = ${token}, expires_at = ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)}
     `
 
-    // Definir cookie
-    cookies().set({
-      name: COOKIE_NAME,
-      value: token,
+    // Criar resposta com cookie
+    const response = NextResponse.json({
+      success: true,
+      user: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        tipo: user.tipo,
+        ativo: user.ativo,
+      },
+    })
+
+    // Definir cookie httpOnly
+    response.cookies.set("auth-token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60, // 7 dias
     })
 
-    // Retornar dados do usuário
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        name: user.nome,
-        email: user.email,
-        type: user.tipo,
-      },
-    })
+    return response
   } catch (error) {
     console.error("Erro no login:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Erro interno do servidor" }, { status: 500 })
   }
 }
