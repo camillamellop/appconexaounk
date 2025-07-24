@@ -1,65 +1,90 @@
+// hooks/use-auth.ts
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { AuthService, type AuthUser } from "@/lib/auth/auth-service"
+import { useState, useEffect, createContext, useContext, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
 
-const TOKEN_KEY = "@unk/auth-token"
+interface User {
+  id: number
+  nome: string
+  email: string
+  tipo: "admin" | "dj" | "produtor"
+  ativo: boolean
+}
 
-export function useAuth() {
-  const [user, setUser] = useState<AuthUser | null>(null)
+interface AuthContextType {
+  user: User | null
+  login: (email: string, senha: string) => Promise<{ success: boolean; user?: User; error?: string }>
+  logout: () => void
+  loading: boolean
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
-    const initAuth = async () => {
+    // Verificar se há usuário logado no localStorage
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
       try {
-        const token = localStorage.getItem(TOKEN_KEY)
-        if (token) {
-          const validatedUser = await AuthService.validateToken(token)
-          setUser(validatedUser)
-        }
+        const parsedUser = JSON.parse(storedUser)
+        setUser(parsedUser)
       } catch (error) {
-        console.error("Auth initialization error:", error)
-        localStorage.removeItem(TOKEN_KEY)
-      } finally {
-        setLoading(false)
+        console.error("Erro ao parsear usuário do localStorage:", error)
+        localStorage.removeItem("user")
       }
     }
-
-    initAuth()
+    setLoading(false)
   }, [])
 
-  const login = useCallback(async (email: string, senha: string) => {
+  const login = async (email: string, senha: string) => {
     try {
-      const result = await AuthService.login(email, senha)
+      // Simulação de login - substitua pela sua API real
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, senha }),
+      })
 
-      if (result) {
-        localStorage.setItem(TOKEN_KEY, result.token)
-        setUser(result.user)
-        return { success: true, user: result.user }
+      if (!response.ok) {
+        return { success: false, error: "Credenciais inválidas" }
       }
 
-      return { success: false, error: "Credenciais inválidas" }
+      const userData = await response.json()
+      
+      setUser(userData.user)
+      localStorage.setItem("user", JSON.stringify(userData.user))
+      
+      return { success: true, user: userData.user }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Erro no login"
-      return { success: false, error: errorMessage }
+      console.error("Erro no login:", error)
+      return { success: false, error: "Erro interno do servidor" }
     }
-  }, [])
-
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY)
-    setUser(null)
-  }, [])
-
-  const isAdmin = useCallback(() => {
-    return user?.tipo === "admin"
-  }, [user])
-
-  return {
-    user,
-    loading,
-    login,
-    logout,
-    isAdmin,
-    isAuthenticated: !!user,
   }
+
+  const logout = () => {
+    setUser(null)
+    localStorage.removeItem("user")
+    router.push("/login")
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider")
+  }
+  return context
 }
