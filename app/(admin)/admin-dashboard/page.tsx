@@ -1,4 +1,3 @@
-// app/(admin)/dashboard/page.tsx
 "use client"
 
 import { useEffect, useState } from "react"
@@ -8,19 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  Users, 
-  Calendar, 
-  DollarSign, 
-  FolderOpen, 
-  Plus, 
-  Activity, 
-  Settings,
-  BarChart3,
-  Shield,
-  TrendingUp,
-  AlertTriangle
-} from "lucide-react"
+import { Users, Calendar, DollarSign, FolderOpen, Plus, Activity, Settings, BarChart3, Shield, TrendingUp, AlertTriangle } from 'lucide-react'
 import { UserManagement } from "@/components/admin/UserManagement"
 import { Analytics } from "@/components/admin/Analytics"
 import { SystemSettings } from "@/components/admin/SystemSettings"
@@ -88,7 +75,7 @@ export default function AdminDashboard() {
       console.error("Erro ao buscar estatísticas admin:", error)
     } finally {
       setLoading(false)
-    )
+    }
   }
 
   if (loading) {

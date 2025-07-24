@@ -2,116 +2,175 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { Eye, EyeOff } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Eye, EyeOff, Volume2 } from 'lucide-react'
+import Image from "next/image"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [senha, setSenha] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-
-  const { login, user, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (user && !loading) {
-      router.push(user.tipo === "admin" ? "/admin-dashboard" : "/dashboard")
+    // Verificar se já está logado
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("user")
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser)
+          if (user.tipo === "admin") {
+            router.push("/admin-dashboard")
+          } else {
+            router.push("/dashboard")
+          }
+        } catch (error) {
+          localStorage.removeItem("user")
+        }
+      }
     }
-  }, [user, loading, router])
+  }, [router])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setLoading(true)
     setError("")
 
     try {
-      const result = await login(email, senha)
-      if (!result.success) {
-        setError(result.error || "Erro no login")
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, senha }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Credenciais inválidas")
       }
-    } catch {
-      setError("Erro interno do servidor")
+
+      const userData = await response.json()
+      
+      if (typeof window !== "undefined") {
+        localStorage.setItem("user", JSON.stringify(userData.user))
+      }
+
+      // Redirecionar baseado no tipo de usuário
+      if (userData.user.tipo === "admin") {
+        router.push("/admin-dashboard")
+      } else {
+        router.push("/dashboard")
+      }
+    } catch (error) {
+      setError("Email ou senha incorretos")
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  // Esta verificação de estado de carregamento é para a verificação inicial de autenticação
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <Card className="bg-gray-800 border-gray-700 rounded-3xl overflow-hidden">
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold text-center text-white">
-              Login
-            </CardTitle>
-          </CardHeader>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="w-full max-w-md">
+        {/* iPod Style Container */}
+        <Card className="bg-slate-800/90 backdrop-blur-sm border-slate-700 rounded-3xl overflow-hidden shadow-2xl">
           <CardContent className="p-8">
-            {/* O formulário estava em falta. Eu adicionei-o aqui. */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Campo de Email */}
-              <div className="space-y-2">
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 rounded-lg"
-                />
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center">
+                <Volume2 className="h-10 w-10 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-white mb-2">Conexão U N K</h1>
+              <p className="text-slate-400 text-sm">Fuderosa Systems</p>
+            </div>
+
+            {/* Progress Bar Simulation */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                <span>1:28</span>
+                <span>3:42</span>
+              </div>
+              <div className="w-full bg-slate-700 rounded-full h-1">
+                <div className="bg-gradient-to-r from-purple-600 to-blue-600 h-1 rounded-full w-1/3"></div>
+              </div>
+            </div>
+
+            {/* Login Form */}
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 rounded-xl h-12"
+                    required
+                  />
+                </div>
+                
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Senha"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    className="bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 rounded-xl h-12 pr-12"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
 
-              {/* Campo de Senha */}
-              <div className="space-y-2 relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Senha"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  required
-                  className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 rounded-lg pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-white"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-
-              {/* Exibição de Mensagem de Erro */}
               {error && (
-                <p className="text-red-500 text-sm text-center">{error}</p>
+                <div className="text-red-400 text-sm text-center bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+                  {error}
+                </div>
               )}
 
-              {/* Botão de Envio */}
               <Button
                 type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition duration-300"
-                disabled={isLoading}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium rounded-xl h-12 transition-all duration-200"
               >
-                {isLoading ? <LoadingSpinner /> : "Entrar"}
+                {loading ? "Conectando..." : "ENTRAR"}
               </Button>
             </form>
+
+            {/* iPod Control Wheel Simulation */}
+            <div className="mt-8 flex justify-center">
+              <div className="w-32 h-32 bg-slate-700/50 rounded-full flex items-center justify-center border border-slate-600">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 bg-slate-800 rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Menu Labels */}
+            <div className="mt-4 text-center space-y-1">
+              <p className="text-slate-400 text-sm font-medium">MENU</p>
+              <p className="text-slate-500 text-xs">SELECT</p>
+            </div>
           </CardContent>
         </Card>
+
+        {/* Footer */}
+        <div className="text-center mt-6">
+          <p className="text-slate-500 text-xs">
+            Sistema UNK Dashboard • Versão 2.0
+          </p>
+        </div>
       </div>
     </div>
   )
