@@ -39,7 +39,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter()
 
   useEffect(() => {
-    // Verifica se está no cliente antes de acessar localStorage
     if (typeof window !== "undefined") {
       const storedUser = localStorage.getItem("user")
       if (storedUser) {
@@ -72,7 +71,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userData = await response.json()
       setUser(userData.user)
       
-      // Verifica se está no cliente antes de salvar no localStorage
       if (typeof window !== "undefined") {
         localStorage.setItem("user", JSON.stringify(userData.user))
       }
@@ -86,7 +84,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = () => {
     setUser(null)
-    // Verifica se está no cliente antes de remover do localStorage
     if (typeof window !== "undefined") {
       localStorage.removeItem("user")
     }
