@@ -1,7 +1,13 @@
 // hooks/use-auth.ts
 "use client"
 
-import { useState, useEffect, createContext, useContext, type ReactNode } from "react"
+import {
+  useState,
+  useEffect,
+  createContext,
+  useContext,
+  ReactNode,
+} from "react"
 import { useRouter } from "next/navigation"
 
 interface User {
@@ -14,20 +20,26 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, senha: string) => Promise<{ success: boolean; user?: User; error?: string }>
+  login: (
+    email: string,
+    senha: string
+  ) => Promise<{ success: boolean; user?: User; error?: string }>
   logout: () => void
   loading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+interface AuthProviderProps {
+  children: ReactNode
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    // Verificar se há usuário logado no localStorage
     const storedUser = localStorage.getItem("user")
     if (storedUser) {
       try {
@@ -43,7 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, senha: string) => {
     try {
-      // Simulação de login - substitua pela sua API real
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -57,10 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const userData = await response.json()
-      
       setUser(userData.user)
       localStorage.setItem("user", JSON.stringify(userData.user))
-      
+
       return { success: true, user: userData.user }
     } catch (error) {
       console.error("Erro no login:", error)
