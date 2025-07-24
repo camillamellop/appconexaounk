@@ -1,4 +1,3 @@
-// hooks/use-auth.ts
 "use client"
 
 import {
@@ -40,14 +39,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter()
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser)
-        setUser(parsedUser)
-      } catch (error) {
-        console.error("Erro ao parsear usuário do localStorage:", error)
-        localStorage.removeItem("user")
+    // Verifica se está no cliente antes de acessar localStorage
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("user")
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser)
+          setUser(parsedUser)
+        } catch (error) {
+          console.error("Erro ao parsear usuário do localStorage:", error)
+          localStorage.removeItem("user")
+        }
       }
     }
     setLoading(false)
@@ -69,7 +71,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const userData = await response.json()
       setUser(userData.user)
-      localStorage.setItem("user", JSON.stringify(userData.user))
+      
+      // Verifica se está no cliente antes de salvar no localStorage
+      if (typeof window !== "undefined") {
+        localStorage.setItem("user", JSON.stringify(userData.user))
+      }
 
       return { success: true, user: userData.user }
     } catch (error) {
@@ -80,7 +86,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem("user")
+    // Verifica se está no cliente antes de remover do localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("user")
+    }
     router.push("/login")
   }
 
