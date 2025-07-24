@@ -1,19 +1,14 @@
 import type React from "react"
+import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/toaster"
-import { PWAProvider } from "@/components/providers/pwa-provider"
+import { AuthProvider } from "@/hooks/use-auth"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "UNK Dashboard",
-  description: "Dashboard para DJs e produtores musicais",
-  manifest: "/manifest.json",
-  themeColor: "#1e293b",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
+  title: "Conexão UNK",
+  description: "Plataforma para DJs e produtores da Conexão UNK",
     generator: 'v0.dev'
 }
 
@@ -23,14 +18,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-          <PWAProvider>
-            {children}
-            <Toaster />
-          </PWAProvider>
-        </ThemeProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   )

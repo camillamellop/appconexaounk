@@ -1,100 +1,82 @@
 "use client"
 
-import {
-  useState,
-  useEffect,
-  createContext,
-  useContext,
-  ReactNode,
-} from "react"
-import { useRouter } from "next/navigation"
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 
-interface User {
+export type User = {
   id: number
-  nome: string
+  name: string
   email: string
-  tipo: "admin" | "dj" | "produtor"
-  ativo: boolean
+  type: string
 }
 
-interface AuthContextType {
+type AuthContextType = {
   user: User | null
-  login: (
-    email: string,
-    senha: string
-  ) => Promise<{ success: boolean; user?: User; error?: string }>
-  logout: () => void
   loading: boolean
+  login: (email: string, password: string) => Promise<void>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-interface AuthProviderProps {
-  children: ReactNode
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedUser = localStorage.getItem("user")
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser)
-          setUser(parsedUser)
-        } catch (error) {
-          console.error("Erro ao parsear usuário do localStorage:", error)
-          localStorage.removeItem("user")
+    // Verificar se o usuário já está autenticado
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/api/auth/me")
+        if (res.ok) {
+          const data = await res.json()
+          setUser(data.user)
         }
+      } catch (error) {
+        console.error("Erro ao verificar autenticação:", error)
+      } finally {
+        setLoading(false)
       }
     }
-    setLoading(false)
+
+    checkAuth()
   }, [])
 
-  const login = async (email: string, senha: string) => {
+  const login = async (email: string, password: string) => {
+    setLoading(true)
     try {
-      const response = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, senha }),
+        body: JSON.stringify({ email, password }),
       })
 
-      if (!response.ok) {
-        return { success: false, error: "Credenciais inválidas" }
+      if (!res.ok) {
+        throw new Error("Falha na autenticação")
       }
 
-      const userData = await response.json()
-      setUser(userData.user)
-      
-      if (typeof window !== "undefined") {
-        localStorage.setItem("user", JSON.stringify(userData.user))
-      }
-
-      return { success: true, user: userData.user }
-    } catch (error) {
-      console.error("Erro no login:", error)
-      return { success: false, error: "Erro interno do servidor" }
+      const data = await res.json()
+      setUser(data.user)
+      return data
+    } finally {
+      setLoading(false)
     }
   }
 
-  const logout = () => {
-    setUser(null)
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("user")
+  const logout = async () => {
+    setLoading(true)
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      })
+      setUser(null)
+    } finally {
+      setLoading(false)
     }
-    router.push("/login")
   }
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

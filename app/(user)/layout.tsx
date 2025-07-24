@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import BottomNavigation from "@/components/layout/BottomNavigation"
 
 export default function UserLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -18,47 +16,30 @@ export default function UserLayout({
       const storedUser = localStorage.getItem("user")
       if (storedUser) {
         try {
-          const parsedUser = JSON.parse(storedUser)
-          
-          // Se for admin, redirecionar para dashboard admin
-          if (parsedUser.tipo === "admin") {
+          const user = JSON.parse(storedUser)
+          if (user.tipo === "admin") {
             router.push("/admin-dashboard")
             return
           }
-          
-          setUser(parsedUser)
         } catch (error) {
-          console.error("Error parsing stored user:", error)
           router.push("/login")
+          return
         }
       } else {
         router.push("/login")
+        return
       }
-      setLoading(false)
     }
+    setLoading(false)
   }, [router])
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-white">Carregando...</p>
-        </div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white">Carregando...</div>
       </div>
     )
   }
 
-  if (!user) {
-    return null
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-900">
-      <main className="pb-20">
-        {children}
-      </main>
-      <BottomNavigation />
-    </div>
-  )
+  return <>{children}</>
 }

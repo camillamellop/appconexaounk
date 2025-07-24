@@ -1,6 +1,6 @@
 /// lib/neon.ts
 
-import { neon, neonConfig, type Sql } from "@neondatabase/serverless"
+import { neon as createNeonClient, neonConfig, type Sql } from "@neondatabase/serverless"
 import { drizzle } from "drizzle-orm/neon-http"
 import { drizzle as drizzlePg } from "drizzle-orm/node-postgres"
 import { Client } from "pg"
@@ -17,7 +17,7 @@ if (!process.env.DATABASE_URL) {
     return Promise.resolve(undefined)
   }) as any
 } else {
-  sql = neon(process.env.DATABASE_URL)
+  sql = createNeonClient(process.env.DATABASE_URL)
 }
 
 // ――― Utility --------------------------------------------------------------
@@ -38,3 +38,11 @@ export const drizzlePgClient = drizzlePg(client)
 
 const pool = new PgPool({ connectionString: process.env.DATABASE_URL })
 export const nodePgPool = pool
+
+export const neon = (connectionString: string) => {
+  if (!connectionString) {
+    throw new Error("DATABASE_URL não está definido")
+  }
+
+  return createNeonClient(connectionString)
+}

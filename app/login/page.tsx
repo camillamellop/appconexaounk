@@ -1,175 +1,228 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
-import { Eye, EyeOff, Volume2 } from 'lucide-react'
-import Image from "next/image"
+import { useAuth } from "@/hooks/use-auth"
+import { VolumeIcon, PlayIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
-  const [senha, setSenha] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [currentTime, setCurrentTime] = useState("1:28")
+  const [progress, setProgress] = useState(30) // 30% progress
   const router = useRouter()
+  const { login, user } = useAuth()
 
   useEffect(() => {
-    // Verificar se já está logado
-    if (typeof window !== "undefined") {
-      const storedUser = localStorage.getItem("user")
-      if (storedUser) {
-        try {
-          const user = JSON.parse(storedUser)
-          if (user.tipo === "admin") {
-            router.push("/admin-dashboard")
-          } else {
-            router.push("/dashboard")
-          }
-        } catch (error) {
-          localStorage.removeItem("user")
-        }
-      }
-    }
-  }, [router])
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
-
-    try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, senha }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Credenciais inválidas")
-      }
-
-      const userData = await response.json()
-      
-      if (typeof window !== "undefined") {
-        localStorage.setItem("user", JSON.stringify(userData.user))
-      }
-
-      // Redirecionar baseado no tipo de usuário
-      if (userData.user.tipo === "admin") {
+    if (user) {
+      if (user.type === "admin") {
         router.push("/admin-dashboard")
       } else {
         router.push("/dashboard")
       }
-    } catch (error) {
+    }
+  }, [user, router])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+
+    try {
+      await login(email, password)
+    } catch (err) {
       setError("Email ou senha incorretos")
     } finally {
       setLoading(false)
     }
   }
 
+  const fillCredentials = (userType: string) => {
+    switch (userType) {
+      case "admin":
+        setEmail("camilla@conexaounk.com")
+        setPassword("camillaunk")
+        break
+      case "pedro":
+        setEmail("pedro@conexaounk.com")
+        setPassword("pedrounk")
+        break
+      case "suzy":
+        setEmail("suzy@conexaounk.com")
+        setPassword("suzyunk")
+        break
+      case "gustavo":
+        setEmail("gustavo@conexaounk.com")
+        setPassword("gustavounk")
+        break
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen flex items-center justify-center bg-black p-4">
       <div className="w-full max-w-md">
-        {/* iPod Style Container */}
-        <Card className="bg-slate-800/90 backdrop-blur-sm border-slate-700 rounded-3xl overflow-hidden shadow-2xl">
-          <CardContent className="p-8">
-            {/* Header */}
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center">
-                <Volume2 className="h-10 w-10 text-white" />
+        {/* iPod Design */}
+        <div className="bg-[#121217] rounded-3xl overflow-hidden shadow-2xl border border-gray-800">
+          {/* Screen */}
+          <div className="p-6 pb-2">
+            <div className="bg-[#1a1a22] rounded-2xl p-6 mb-4">
+              <div className="text-center mb-6">
+                <h1 className="text-white text-2xl font-bold tracking-wider">Conexão U N K</h1>
+                <p className="text-gray-400 text-sm">Fuderosa Systems</p>
               </div>
-              <h1 className="text-2xl font-bold text-white mb-2">Conexão U N K</h1>
-              <p className="text-slate-400 text-sm">Fuderosa Systems</p>
-            </div>
 
-            {/* Progress Bar Simulation */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                <span>1:28</span>
-                <span>3:42</span>
-              </div>
-              <div className="w-full bg-slate-700 rounded-full h-1">
-                <div className="bg-gradient-to-r from-purple-600 to-blue-600 h-1 rounded-full w-1/3"></div>
-              </div>
-            </div>
-
-            {/* Login Form */}
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <Input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 rounded-xl h-12"
-                    required
-                  />
+              <div className="flex justify-center mb-8">
+                <div className="bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl p-4 w-20 h-20 flex items-center justify-center">
+                  <VolumeIcon className="w-10 h-10 text-white" />
                 </div>
-                
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Senha"
-                    value={senha}
-                    onChange={(e) => setSenha(e.target.value)}
-                    className="bg-slate-700/50 border-slate-600 text-white placeholder-slate-400 rounded-xl h-12 pr-12"
-                    required
-                  />
+              </div>
+
+              {showForm && (
+                <form onSubmit={handleLogin} className="space-y-4 mb-6">
+                  <div>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Email"
+                      className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Senha"
+                      className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      required
+                    />
+                  </div>
+                  {error && (
+                    <div className="bg-red-900/50 border border-red-800 text-red-200 p-2 rounded-lg text-center">
+                      {error}
+                    </div>
+                  )}
                   <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50"
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {loading ? "Entrando..." : "ENTRAR"}
                   </button>
-                </div>
-              </div>
-
-              {error && (
-                <div className="text-red-400 text-sm text-center bg-red-500/10 p-3 rounded-lg border border-red-500/20">
-                  {error}
-                </div>
+                </form>
               )}
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium rounded-xl h-12 transition-all duration-200"
-              >
-                {loading ? "Conectando..." : "ENTRAR"}
-              </Button>
-            </form>
-
-            {/* iPod Control Wheel Simulation */}
-            <div className="mt-8 flex justify-center">
-              <div className="w-32 h-32 bg-slate-700/50 rounded-full flex items-center justify-center border border-slate-600">
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
-                  <div className="w-8 h-8 bg-slate-800 rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-white rounded-full"></div>
-                  </div>
+              {/* Progress bar */}
+              <div className="mt-auto">
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>1:28</span>
+                  <span>3:42</span>
+                </div>
+                <div className="h-1 bg-gray-800 rounded-full">
+                  <div
+                    className="h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                    style={{ width: `${progress}%` }}
+                  ></div>
                 </div>
               </div>
             </div>
 
-            {/* Menu Labels */}
-            <div className="mt-4 text-center space-y-1">
-              <p className="text-slate-400 text-sm font-medium">MENU</p>
-              <p className="text-slate-500 text-xs">SELECT</p>
-            </div>
-          </CardContent>
-        </Card>
+            {/* iPod Controls */}
+            <div className="flex flex-col items-center">
+              <div className="text-gray-400 text-xs mb-2">MENU</div>
+              <div className="relative w-48 h-48 bg-gray-800 rounded-full flex items-center justify-center">
+                {/* Center button */}
+                <button
+                  onClick={() => handleLogin({ preventDefault: () => {} } as React.FormEvent)}
+                  className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center z-10"
+                >
+                  <PlayIcon className="w-8 h-8 text-white" />
+                </button>
 
-        {/* Footer */}
-        <div className="text-center mt-6">
-          <p className="text-slate-500 text-xs">
-            Sistema UNK Dashboard • Versão 2.0
-          </p>
+                {/* Control buttons */}
+                <button
+                  onClick={() => fillCredentials("pedro")}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white"
+                >
+                  <ChevronLeftIcon className="w-8 h-8" />
+                </button>
+                <button
+                  onClick={() => fillCredentials("suzy")}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white"
+                >
+                  <ChevronRightIcon className="w-8 h-8" />
+                </button>
+                <button
+                  onClick={() => setShowForm(!showForm)}
+                  className="absolute top-4 left-1/2 transform -translate-x-1/2 text-white"
+                >
+                  <span className="sr-only">Menu</span>
+                </button>
+                <button
+                  onClick={() => fillCredentials("admin")}
+                  className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white"
+                >
+                  <span className="sr-only">Select</span>
+                </button>
+              </div>
+              <div className="text-gray-400 text-xs mt-2">SELECT</div>
+            </div>
+          </div>
+
+          {/* Quick login buttons */}
+          <div className="bg-[#0a0a0f] p-4 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => {
+                fillCredentials("admin")
+                setTimeout(() => handleLogin({ preventDefault: () => {} } as React.FormEvent), 500)
+              }}
+              className="bg-gray-800 text-white p-2 rounded-lg text-sm hover:bg-gray-700"
+            >
+              Admin: Camilla
+            </button>
+            <button
+              onClick={() => {
+                fillCredentials("pedro")
+                setTimeout(() => handleLogin({ preventDefault: () => {} } as React.FormEvent), 500)
+              }}
+              className="bg-gray-800 text-white p-2 rounded-lg text-sm hover:bg-gray-700"
+            >
+              DJ: Pedro
+            </button>
+            <button
+              onClick={() => {
+                fillCredentials("suzy")
+                setTimeout(() => handleLogin({ preventDefault: () => {} } as React.FormEvent), 500)
+              }}
+              className="bg-gray-800 text-white p-2 rounded-lg text-sm hover:bg-gray-700"
+            >
+              DJ: Suzy
+            </button>
+            <button
+              onClick={() => {
+                fillCredentials("gustavo")
+                setTimeout(() => handleLogin({ preventDefault: () => {} } as React.FormEvent), 500)
+              }}
+              className="bg-gray-800 text-white p-2 rounded-lg text-sm hover:bg-gray-700"
+            >
+              DJ: Gustavo
+            </button>
+          </div>
+        </div>
+
+        {/* Login instructions */}
+        <div className="mt-6 text-center text-gray-400 text-sm">
+          <p>Clique em MENU para mostrar/esconder o formulário</p>
+          <p>Use as setas para preencher credenciais de Pedro/Suzy</p>
+          <p>Use SELECT para preencher credenciais de Admin</p>
+          <p>Ou clique nos botões abaixo para login rápido</p>
         </div>
       </div>
     </div>
