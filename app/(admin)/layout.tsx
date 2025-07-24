@@ -1,5 +1,6 @@
 import type React from "react"
-import { BottomNavigation } from "@/components/layout/BottomNavigation"
+import { AuthWrapper } from "@/components/auth/AuthWrapper"
+import BottomNavigation from "@/components/layout/BottomNavigation"
 
 export default function AdminLayout({
   children,
@@ -7,9 +8,11 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-slate-900">
-      <main className="pb-20">{children}</main>
-      <BottomNavigation />
-    </div>
+    <AuthWrapper requireAdmin>
+      <div className="min-h-screen bg-gray-900 text-white">
+        <div className="pb-20">{children}</div>
+        <BottomNavigation />
+      </div>
+    </AuthWrapper>
   )
 }

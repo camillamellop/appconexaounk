@@ -1,4 +1,5 @@
 import type React from "react"
+import { AuthWrapper } from "@/components/auth/AuthWrapper"
 import BottomNavigation from "@/components/layout/BottomNavigation"
 
 export default function UserLayout({
@@ -7,9 +8,11 @@ export default function UserLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-slate-900">
-      <main className="pb-20">{children}</main>
-      <BottomNavigation />
-    </div>
+    <AuthWrapper>
+      <div className="min-h-screen bg-gray-900 text-white">
+        <div className="pb-20">{children}</div>
+        <BottomNavigation />
+      </div>
+    </AuthWrapper>
   )
 }
